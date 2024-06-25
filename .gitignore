@@ -1,0 +1,7 @@
+__pycache__/
+data/*
+img/*
+model/*
+out/*
+logs/*
+.command.bat
