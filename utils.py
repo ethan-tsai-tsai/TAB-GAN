@@ -65,9 +65,10 @@ def save_predict_plot(args, dates, y_preds, y_true=None):
     plt.figure(figsize=(20, 10))
     plt.grid(True)
     for i in range(len(y_preds)):
-        plt.plot(range(i, i+target_length), y_preds[i], color=colors[6+i])
+        plt.plot(range(i*args.window_stride, i*args.window_stride+target_length), y_preds[i], color=colors[6+i])
     if y_true is not None:
         plt.plot(range(seq_unit*(args.num_days-1)+target_length), y_true, color='black', label='real')
+
     plt.legend()
     plt.xticks(x_ticks, x_labels, rotation=15)
     plt.title(f'{dates[0]} - {dates[-1]}')

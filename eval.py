@@ -68,6 +68,5 @@ if __name__ == '__main__':
             if i == 0: 
                 y_trues = np.concatenate((y_trues, y_true.flatten()))
             else: 
-                y_trues = np.concatenate((y_trues, y_true[-1]))
-            
+                y_trues = np.concatenate((y_trues, y_true.flatten()[len(y_true)-args.window_stride:len(y_true)]))
         save_predict_plot(args, eval_date, y_preds, y_trues)

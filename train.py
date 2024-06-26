@@ -38,7 +38,17 @@ def compute_gradient_penalty(real_data, fake_data):
     return 10 * ((gradients_norm - 1) ** 2).mean()
 
 def generator_loss(real_data, fake_data):
-    return -torch.mean(model_d(fake_data)) + loss_fn(fake_data, real_data)
+    return -torch.mean(model_d(fake_data)) + loss_fn(fake_data, real_data) + change_loss_fn(real_data[:, :fake_data.shape[1], :], fake_data)
+
+class PriceChangeLoss(nn.Module):
+    def __init__(self):
+        super(PriceChangeLoss, self).__init__()
+
+    def forward(self, real_prices, predicted_prices):
+        real_change = (real_prices[:, 1, :] - real_prices[:, -1, :]) / real_prices[:, -1, :]
+        predicted_change = (predicted_prices[:, 1, :] - predicted_prices[:, -1, :]) / predicted_prices[:, -1, :]
+        loss = torch.mean(torch.abs(real_change - predicted_change))
+        return loss
 
 def discriminator_loss(real_data, fake_data, gradient_penalty=0):
     return -torch.mean(model_d(real_data)) + torch.mean(model_d(fake_data)) + gradient_penalty
@@ -153,6 +163,7 @@ if __name__ == '__main__':
     optimizer_d = torch.optim.Adam(model_d.parameters(), lr=args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-5)
     optimizer_g = torch.optim.Adam(model_g.parameters(), lr=args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-5)
     loss_fn = nn.SmoothL1Loss()
+    change_loss_fn = PriceChangeLoss()
     # train model
     print('------------------------------------------------------------------------------------------------')
     print(f'Start training {args.name}')
