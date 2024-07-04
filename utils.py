@@ -36,7 +36,7 @@ def save_model(model_d, model_g, args):
         'model_g': model_g.state_dict()
     }, f'./model/{args.stock}_{args.name}.pth')
 
-def save_predict_plot(args, dates, y_preds, y_true=None):
+def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     # 設定變數
     seq_unit = 270//args.time_step
     target_length = args.target_length//args.time_step
@@ -74,8 +74,8 @@ def save_predict_plot(args, dates, y_preds, y_true=None):
     plt.title(f'{dates[0]} - {dates[-1]}')
     plt.xlabel('Time')
     plt.ylabel('Stock Price')
-    plt.savefig(f'./img/pred/{args.stock}_{args.name}/pred_{dates[-1]}.png')
-    print(f'Svaving prediction: {dates[-1]}')
+    plt.savefig(f'{path}/{args.stock}_{args.name}/{file_name}.png')
+    # print(f'Svaving prediction: {dates[-1]}')
     plt.close()
 
 def clear_folder(folder_path):

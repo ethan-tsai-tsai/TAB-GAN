@@ -69,7 +69,7 @@ class generator(nn.Module):
         super(generator, self).__init__()
         self.device = device
         self.num_layers = 2
-        self.hidden_layer_size = 128
+        self.hidden_layer_size = 64
         self.bn = nn.BatchNorm1d(input_size)
         self.lstm = nn.LSTM(input_size, self.hidden_layer_size, self.num_layers, dropout=0.2, batch_first=True)
         self.fc = nn.Linear(self.hidden_layer_size, output_size)
@@ -88,8 +88,8 @@ class generator(nn.Module):
 class discriminator(nn.Module):
     def __init__(self, input_size):
         super(discriminator, self).__init__()
-        self.num_channels = [8, 8, 8, 8]
-        self.tcn = TCN(input_size, 1, self.num_channels, 2, 0.4)
+        self.num_channels = [8, 8, 8, 8, 8, 8, 8, 8]
+        self.tcn = TCN(input_size, 1, self.num_channels, 2, 0.2)
     def forward(self, x):
         output = self.tcn(x)
         return output

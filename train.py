@@ -10,6 +10,7 @@ from preprocessing import *
 from model import *
 from utils import *
 from arguments import *
+from eval import *
 
 def compute_gradient_penalty(real_data, fake_data):
     batch_size = real_data.size()[0]
@@ -130,7 +131,9 @@ def train(train_loader, test_loader, model_d, model_g, optimizer_d, optimizer_g,
         writer.add_scalar('Loss/test/Discriminator', test_loss_d, epoch)
         if (epoch+1)%(args.epoch//10)==0:
             print(f'Epoch: {epoch+1}/{args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
-            writer.add_
+            for date in val_dates:
+                val_date, y_preds, y_trues = prepare_eval_data(model_g, stock_data, device, date, args)
+                save_predict_plot(args, './logs', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
     return results
             
 if __name__ == '__main__':
@@ -149,6 +152,7 @@ if __name__ == '__main__':
     test_datasets = Subset(stock_data, range(split_idx, len(stock_data)))
     train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
     test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
+    val_dates = random.sample(stock_data.time_intervals, args.num_val)
     noise_dim = args.noise_dim
     # model setting
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'

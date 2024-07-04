@@ -21,19 +21,36 @@ def predict(model_g, device, X, y=None):
         else: y_true = None
         return y_pred, y_true
 
-def kalman_smoothing(predictions):
-    kf = pykalman.KalmanFilter(initial_state_mean=predictions[0], n_dim_obs=1)
-    smoothed_state_means, _ = kf.smooth(predictions)
-    return smoothed_state_means.flatten()
+def prepare_eval_data(model_g, stock_data, device, date, args):
+    eval_date = stock_data.time_intervals[stock_data.time_intervals.index(date):stock_data.time_intervals.index(date)+5]
+    X, y = stock_data.get_data(date, days=args.num_days)
+    # add noise
+    X, y = X.to(device), y.to(device)
+    y = y.unsqueeze(2)
+    noise = torch.randn(X.shape[0],X.shape[1], args.noise_dim).to(device)
+    X = torch.cat((X, noise), dim=2)
+    y_preds = []
+    y_trues = []
+    for i in range(X.shape[0]):
+        y_pred, y_true = predict(model_g, device, X[i], y[i])
+        y_true = stock_data.scaler_y.inverse_transform(y_true)
+        y_pred = stock_data.scaler_y.inverse_transform([y_pred])[0]
+        y_preds.append(y_pred)
+    
+        # 處理 y_true
+        if i == 0: 
+            y_trues = np.concatenate((y_trues, y_true.flatten()))
+        else: 
+            y_trues = np.concatenate((y_trues, y_true.flatten()[len(y_true)-args.window_stride:len(y_true)]))
+    return eval_date, y_preds, y_trues
 
 if __name__ == '__main__':
     args = parse_args()
     
     FILE_NAME = f'{args.stock}_{args.name}'
-    noise_dim = args.noise_dim
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
     stock_data = StockDataset(args, mode='test')
-    model_g = generator(stock_data.num_features + noise_dim, stock_data.target_length, device)
+    model_g = generator(stock_data.num_features + args.noise_dim, stock_data.target_length, device)
     model_cp = torch.load(f'./model/{FILE_NAME}.pth')
     model_g.load_state_dict(model_cp['model_g'])
     
@@ -45,28 +62,7 @@ if __name__ == '__main__':
     # 清空資料夾內容
     if not os.path.exists(f'./img/pred/{FILE_NAME}'): os.makedirs(f'./img/pred/{FILE_NAME}')
     clear_folder(f'./img/pred/{FILE_NAME}')
-    
     eval_dates = random.sample(stock_data.time_intervals, args.num_eval)
     for date in eval_dates:
-        eval_date = stock_data.time_intervals[stock_data.time_intervals.index(date):stock_data.time_intervals.index(date)+5]
-        X, y = stock_data.get_data(date, days=args.num_days)
-        # add noise
-        X, y = X.to(device), y.to(device)
-        y = y.unsqueeze(2)
-        noise = torch.randn(X.shape[0],X.shape[1], noise_dim).to(device)
-        X = torch.cat((X, noise), dim=2)
-        y_preds = []
-        y_trues = []
-        for i in range(X.shape[0]):
-            y_pred, y_true = predict(model_g, device, X[i], y[i])
-            y_true = stock_data.scaler_y.inverse_transform(y_true)
-            y_pred = stock_data.scaler_y.inverse_transform([y_pred])[0]
-            y_preds.append(y_pred)
-            # 多日預測
-        
-            # 處理 y_true
-            if i == 0: 
-                y_trues = np.concatenate((y_trues, y_true.flatten()))
-            else: 
-                y_trues = np.concatenate((y_trues, y_true.flatten()[len(y_true)-args.window_stride:len(y_true)]))
-        save_predict_plot(args, eval_date, y_preds, y_trues)
+        eval_date, y_preds, y_trues = prepare_eval_data(model_g, stock_data, device, date, args)
+        save_predict_plot(args, './img/pred', f'pred_{eval_date[-1]}', eval_date, y_preds, y_trues)
