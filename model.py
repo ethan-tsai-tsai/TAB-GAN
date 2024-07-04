@@ -88,8 +88,8 @@ class generator(nn.Module):
 class discriminator(nn.Module):
     def __init__(self, input_size):
         super(discriminator, self).__init__()
-        self.num_channels = [16, 16, 16]
-        self.tcn = TCN(input_size, 1, self.num_channels, 2, 0.5)
+        self.num_channels = [8, 8, 8, 8]
+        self.tcn = TCN(input_size, 1, self.num_channels, 2, 0.4)
     def forward(self, x):
         output = self.tcn(x)
         return output

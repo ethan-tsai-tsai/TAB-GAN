@@ -124,19 +124,13 @@ def train(train_loader, test_loader, model_d, model_g, optimizer_d, optimizer_g,
         results['test_loss_d'].append(test_loss_d)
         results['test_loss_g'].append(test_loss_g)
         # 寫入 Summary Writer
-        writer.add_scalar('Discriminator training loss', loss_d, epoch)
-        writer.add_scalar('Generator training loss', loss_g, epoch)
-        writer.add_scalar('Generator testing loss', test_loss_g, epoch)
-        writer.add_scalar('Discriminator testing loss', test_loss_d, epoch)
+        writer.add_scalar('Loss/train/Discriminator', loss_d, epoch)
+        writer.add_scalar('Loss/train/Generator', loss_g, epoch)
+        writer.add_scalar('Loss/test/Generator', test_loss_g, epoch)
+        writer.add_scalar('Loss/test/Discriminator', test_loss_d, epoch)
         if (epoch+1)%(args.epoch//10)==0:
             print(f'Epoch: {epoch+1}/{args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
-            for name, param in model_g.named_parameters():
-                writer.add_histogram(f'Generator/{name}', param, epoch)
-                writer.add_histogram(f'Generator/{name}.grad', param.grad, epoch)
-
-            for name, param in model_d.named_parameters():
-                writer.add_histogram(f'Discriminator/{name}', param, epoch)
-                writer.add_histogram(f'Discriminator/{name}.grad', param.grad, epoch)
+            writer.add_
     return results
             
 if __name__ == '__main__':
