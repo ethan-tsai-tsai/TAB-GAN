@@ -17,15 +17,15 @@ class TemporalBlock(nn.Module):
         self.net = nn.Sequential(
             self.conv1,
             Chomp1d(padding),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Dropout(dropout),
             self.conv2,
             Chomp1d(padding),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Dropout(dropout)            
         )
         self.downsample = nn.Conv1d(n_inputs, n_outputs, 1) if n_inputs != n_outputs else None
-        self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU()
         self.init_weights()
     def init_weights(self):
         self.conv1.weight.data.normal_(0, 0.01)
@@ -67,28 +67,36 @@ class TCN(nn.Module):
 class generator(nn.Module):
     def __init__(self, input_size, output_size, device):
         super(generator, self).__init__()
+        self.input_size = input_size
         self.device = device
-        self.num_layers = 2
-        self.hidden_layer_size = 64
-        self.bn = nn.BatchNorm1d(input_size)
-        self.lstm = nn.LSTM(input_size, self.hidden_layer_size, self.num_layers, dropout=0.2, batch_first=True)
-        self.fc = nn.Linear(self.hidden_layer_size, output_size)
+        self.hidden_layer_size = [64, 128, 64]
+        
+        # 定義LSTM層的ModuleList
+        self.lstm_list = nn.ModuleList(
+            [nn.LSTM(input_size if i == 0 else self.hidden_layer_size[i-1], self.hidden_layer_size[i], batch_first=True) 
+             for i in range(len(self.hidden_layer_size))]
+        )
+        
+        self.dropout = nn.Dropout(0.2)
+        self.fc = nn.Linear(self.hidden_layer_size[-1], output_size)
     
     def forward(self, x):
-        batch_size, seq_len, num_features = x.shape[0], x.shape[1], x.shape[2]
-        x = self.bn(x.view(-1, num_features)).view(batch_size, seq_len, num_features)
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_layer_size).to(self.device).requires_grad_()
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_layer_size).to(self.device).requires_grad_()
-        out, _ = self.lstm(x, (h0, c0))
+        for i in range(len(self.lstm_list)):
+            h0 = torch.zeros(1, x.size(0), self.hidden_layer_size[i]).to(self.device)
+            c0 = torch.zeros(1, x.size(0), self.hidden_layer_size[i]).to(self.device)
+            out, _ = self.lstm_list[i](x, (h0, c0))
+            x = self.dropout(out)  # 將輸出賦值給x，作為下一層的輸入
+        
+        out = out[:, -1, :]  # 取出最後一個時間步的輸出
         out = self.fc(out)
-        out = out[:, -1, :]
         out = out.unsqueeze(2)
         return out
+
 
 class discriminator(nn.Module):
     def __init__(self, input_size):
         super(discriminator, self).__init__()
-        self.num_channels = [8, 8, 8, 8, 8, 8, 8, 8]
+        self.num_channels = [32, 64, 64, 64, 128, 64, 64, 32]
         self.tcn = TCN(input_size, 1, self.num_channels, 2, 0.2)
     def forward(self, x):
         output = self.tcn(x)

@@ -38,10 +38,10 @@ class StockDataset(Dataset):
         self.complete_data() 
         
         # 加入日期欄位
-        self.data['month'] = self.data.index.to_series().dt.month
-        self.data['day'] = self.data.index.to_series().dt.day
-        self.data['hour'] = self.data.index.to_series().dt.hour
-        self.data['minute'] = self.data.index.to_series().dt.minute
+        # self.data['month'] = self.data.index.to_series().dt.month
+        # self.data['day'] = self.data.index.to_series().dt.day
+        # self.data['hour'] = self.data.index.to_series().dt.hour
+        # self.data['minute'] = self.data.index.to_series().dt.minute
         self.data['y'] = self.data['Close']
         
         self.standardize() # 正規化
@@ -103,7 +103,8 @@ class StockDataset(Dataset):
         self.X, self.y = [], []
         for i in range(0, len(self.data) - self.seq_len - self.target_length, self.window_stride):
             self.X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)
-            self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values)
+            # self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 只取最後
+            self.y.append(self.data.iloc[i:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 取X天數+最後
 
     def get_data(self, date, days):
         X, y= [], []
@@ -112,7 +113,8 @@ class StockDataset(Dataset):
             idx = self.data.index.get_loc(date)
             for i in range(idx, 1+idx + (days-1)*self.seq_len//self.window_size, self.window_stride):
                 X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)
-                y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values)
+                y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 只取最後
+                # y.append(self.data.iloc[i:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 取X天數+最後
         except:
             idx = len(self.data) - self.seq_len//self.window_size
             X.append(self.data.iloc[idx-self.seq_len:idx, :].values)

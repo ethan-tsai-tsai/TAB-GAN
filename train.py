@@ -39,17 +39,7 @@ def compute_gradient_penalty(real_data, fake_data):
     return 10 * ((gradients_norm - 1) ** 2).mean()
 
 def generator_loss(real_data, fake_data):
-    return -torch.mean(model_d(fake_data)) + loss_fn(fake_data, real_data) + change_loss_fn(real_data[:, :fake_data.shape[1], :], fake_data)
-
-class PriceChangeLoss(nn.Module):
-    def __init__(self):
-        super(PriceChangeLoss, self).__init__()
-
-    def forward(self, real_prices, predicted_prices):
-        real_change = (real_prices[:, 1, :] - real_prices[:, -1, :]) / real_prices[:, -1, :]
-        predicted_change = (predicted_prices[:, 1, :] - predicted_prices[:, -1, :]) / predicted_prices[:, -1, :]
-        loss = torch.mean(torch.abs(real_change - predicted_change))
-        return loss
+    return -torch.mean(model_d(fake_data))# + loss_fn(fake_data, real_data)
 
 def discriminator_loss(real_data, fake_data, gradient_penalty=0):
     return -torch.mean(model_d(real_data)) + torch.mean(model_d(fake_data)) + gradient_penalty
@@ -63,24 +53,27 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     noise = torch.randn(X.shape[0], X.shape[1], noise_dim).to(device)
     X = torch.cat((X, noise), dim=2)
     # train discriminator
-    for _ in range(3):
+    for _ in range(5):
         real_data = y.unsqueeze(2)
         fake_data = model_g(X)
         if torch.isnan(fake_data).any():
-            print('generated data has NaN values.')
+            print('Generated data has nan values. Stop training.')
             os._exit(0)
+        fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
         gradient_penalty = compute_gradient_penalty(real_data, fake_data)
         loss_d = discriminator_loss(real_data, fake_data, gradient_penalty)
         optimizer_d.zero_grad()
         loss_d.backward()
         optimizer_d.step()
-    
+
     # train generator
-    fake_data = model_g(X)
+    fake_data = model_g(X) 
+    fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
     loss_g = generator_loss(real_data, fake_data)
-    optimizer_g.zero_grad()
-    loss_g.backward()
-    optimizer_g.step()
+    if not torch.isnan(loss_g).any():
+        optimizer_g.zero_grad()
+        loss_g.backward()
+        optimizer_g.step()
     
     return loss_d, loss_g    
 
@@ -99,11 +92,13 @@ def test_iter(test_loader, model_d, model_g, device, args):
             # evaluate discriminator
             real_data = y.unsqueeze(2)
             fake_data = model_g(X)
+            fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
             loss_d = discriminator_loss(real_data, fake_data)
             total_loss_d += loss_d.cpu().detach().numpy()
             
             # evaluate generator
             fake_data = model_g(X)
+            fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
             loss_g = generator_loss(real_data, fake_data)
             total_loss_g += loss_g.cpu().detach().numpy()
     return total_loss_d, total_loss_g
@@ -158,10 +153,9 @@ if __name__ == '__main__':
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
     model_d = discriminator(1)
     model_g = generator(stock_data.num_features + noise_dim, stock_data.target_length, device)
-    optimizer_d = torch.optim.Adam(model_d.parameters(), lr=args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-5)
-    optimizer_g = torch.optim.Adam(model_g.parameters(), lr=args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-5)
+    optimizer_d = torch.optim.Adam(model_d.parameters(), lr=args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
+    optimizer_g = torch.optim.Adam(model_g.parameters(), lr=args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
     loss_fn = nn.SmoothL1Loss()
-    change_loss_fn = PriceChangeLoss()
     # train model
     print('------------------------------------------------------------------------------------------------')
     print(f'Start training {args.name}')

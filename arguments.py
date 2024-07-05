@@ -6,18 +6,18 @@ def parse_args():
     parser.add_argument('--name', type=str, default='m', help='模型名稱')
     parser.add_argument('--stock', type=str, default='0050', help='股票編號')
     parser.add_argument('--window_size', type=int, default=3, help='移動窗格大小（用幾天的資料量來預測下一天）')
-    parser.add_argument('--window_stride', type=int, default=1, help='移動窗格的移動步伐')
-    parser.add_argument('--target_length', type=int, default=60, help='生成器輸出的序列長度')
+    parser.add_argument('--window_stride', type=int, default=3, help='移動窗格的移動步伐')
+    parser.add_argument('--target_length', type=int, default=150, help='生成器輸出的序列長度')
     parser.add_argument('--noise_dim', type=int, default=5, help='輸入生成器的噪聲維度')
     parser.add_argument('--time_step', type=int, default=30, help="輸入為每N分鐘的資料")
     
     # Train
-    parser.add_argument('--lr_g', type=float, default=0.000001, help='generator learning rate')
-    parser.add_argument('--lr_d', type=float, default=0.00001, help='discriminator learning rate')
+    parser.add_argument('--lr_g', type=float, default=0.0001, help='generator learning rate')
+    parser.add_argument('--lr_d', type=float, default=0.0001, help='discriminator learning rate')
     parser.add_argument('--cuda', type=int, default=7, help='cuda number')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs')
-    parser.add_argument('--batch_size', type=int, default=32, help='batch size')
-    parser.add_argument('--num_val', type=int, default=4, help='每次驗證需要的筆數')
+    parser.add_argument('--batch_size', type=int, default=128, help='batch size')
+    parser.add_argument('--num_val', type=int, default=2, help='每次驗證需要的筆數')
     
     # Evaluation
     parser.add_argument('--num_days', type=int, default=5, help='單張折線圖中的天數')
