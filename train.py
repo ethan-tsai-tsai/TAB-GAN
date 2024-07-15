@@ -12,7 +12,7 @@ from utils import *
 from arguments import *
 from eval import *
 
-def compute_gradient_penalty(real_data, fake_data):
+def compute_gradient_penalty(cond, real_data, fake_data):
     batch_size = real_data.size()[0]
 
     # Calculate interpolation
@@ -22,7 +22,7 @@ def compute_gradient_penalty(real_data, fake_data):
     interpolated = torch.autograd.Variable(interpolated, requires_grad=True).to(device)
 
     # Calculate probability of interpolated examples
-    prob_interpolated = model_d(interpolated)
+    prob_interpolated = model_d(cond, interpolated)
 
     # Calculate gradients of probabilities with respect to examples
     gradients = torch.autograd.grad(
@@ -38,11 +38,11 @@ def compute_gradient_penalty(real_data, fake_data):
     gradients_norm = torch.sqrt(torch.sum(gradients ** 2, dim=1) + 1e-12)
     return 10 * ((gradients_norm - 1) ** 2).mean()
 
-def generator_loss(real_data, fake_data):
-    return -torch.mean(model_d(fake_data))# + loss_fn(fake_data, real_data)
+def generator_loss(cond, real_data, fake_data):
+    return -torch.mean(model_d(cond, fake_data))# + loss_fn(fake_data, real_data)
 
-def discriminator_loss(real_data, fake_data, gradient_penalty=0):
-    return -torch.mean(model_d(real_data)) + torch.mean(model_d(fake_data)) + gradient_penalty
+def discriminator_loss(cond, real_data, fake_data, gradient_penalty=0):
+    return -torch.mean(model_d(cond, real_data)) + torch.mean(model_d(cond, fake_data)) + gradient_penalty
 
 def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     # train discriminator
@@ -50,6 +50,7 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     model_g.train()
 
     # add noise
+    cond = X.clone()
     noise = torch.randn(X.shape[0], X.shape[1], noise_dim).to(device)
     X = torch.cat((X, noise), dim=2)
     # train discriminator
@@ -59,17 +60,17 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
         if torch.isnan(fake_data).any():
             print('Generated data has nan values. Stop training.')
             os._exit(0)
-        fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
-        gradient_penalty = compute_gradient_penalty(real_data, fake_data)
-        loss_d = discriminator_loss(real_data, fake_data, gradient_penalty)
+        # fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
+        gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
+        loss_d = discriminator_loss(cond, real_data, fake_data, gradient_penalty)
         optimizer_d.zero_grad()
         loss_d.backward()
         optimizer_d.step()
 
     # train generator
-    fake_data = model_g(X) 
-    fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
-    loss_g = generator_loss(real_data, fake_data)
+    fake_data = model_g(X)
+    # fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
+    loss_g = generator_loss(cond, real_data, fake_data)
     if not torch.isnan(loss_g).any():
         optimizer_g.zero_grad()
         loss_g.backward()
@@ -83,23 +84,23 @@ def test_iter(test_loader, model_d, model_g, device, args):
         total_loss_d, total_loss_g = 0, 0
         for _, (X, y) in enumerate(test_loader):
             X, y = X.to(device), y.to(device)
+            cond = X.clone()
             # add noise
             noise = torch.randn(X.shape[0], X.shape[1], noise_dim).to(device)
             X = torch.cat((X, noise), dim=2)
-            
             model_g.eval()
             model_d.eval()
             # evaluate discriminator
             real_data = y.unsqueeze(2)
             fake_data = model_g(X)
-            fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
-            loss_d = discriminator_loss(real_data, fake_data)
+            # fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
+            loss_d = discriminator_loss(cond, real_data, fake_data)
             total_loss_d += loss_d.cpu().detach().numpy()
             
             # evaluate generator
             fake_data = model_g(X)
-            fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
-            loss_g = generator_loss(real_data, fake_data)
+            # fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
+            loss_g = generator_loss(cond ,real_data, fake_data)
             total_loss_g += loss_g.cpu().detach().numpy()
     return total_loss_d, total_loss_g
 
@@ -151,11 +152,12 @@ if __name__ == '__main__':
     noise_dim = args.noise_dim
     # model setting
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
-    model_d = discriminator(1)
+    model_d = discriminator(stock_data.num_features, 1)
     model_g = generator(stock_data.num_features + noise_dim, stock_data.target_length, device)
     optimizer_d = torch.optim.Adam(model_d.parameters(), lr=args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
     optimizer_g = torch.optim.Adam(model_g.parameters(), lr=args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
-    loss_fn = nn.SmoothL1Loss()
+    # loss_fn = nn.SmoothL1Loss(reduction='sum')
+    loss_fn = nn.MSELoss(reduction='sum')
     # train model
     print('------------------------------------------------------------------------------------------------')
     print(f'Start training {args.name}')

@@ -103,8 +103,8 @@ class StockDataset(Dataset):
         self.X, self.y = [], []
         for i in range(0, len(self.data) - self.seq_len - self.target_length, self.window_stride):
             self.X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)
-            # self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 只取最後
-            self.y.append(self.data.iloc[i:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 取X天數+最後
+            self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 只取最後
+            # self.y.append(self.data.iloc[i:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 取X天數+最後
 
     def get_data(self, date, days):
         X, y= [], []

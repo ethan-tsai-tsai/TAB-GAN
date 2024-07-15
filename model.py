@@ -85,7 +85,7 @@ class generator(nn.Module):
             h0 = torch.zeros(1, x.size(0), self.hidden_layer_size[i]).to(self.device)
             c0 = torch.zeros(1, x.size(0), self.hidden_layer_size[i]).to(self.device)
             out, _ = self.lstm_list[i](x, (h0, c0))
-            x = self.dropout(out)  # 將輸出賦值給x，作為下一層的輸入
+            x = self.dropout(out)
         
         out = out[:, -1, :]  # 取出最後一個時間步的輸出
         out = self.fc(out)
@@ -93,11 +93,51 @@ class generator(nn.Module):
         return out
 
 
+# class discriminator(nn.Module):
+#     def __init__(self, cond_dim, x_dim):
+#         super(discriminator, self).__init__()
+#         self.hidden_dim = 16
+#         self.cond_projection = nn.Linear(cond_dim, self.hidden_dim)
+#         self.x_projection = nn.Linear(x_dim, self.hidden_dim)
+#         self.num_channels = [32, 32, 32, 32, 32, 32, 32, 32]
+#         self.tcn = TCN(self.hidden_dim, 1, self.num_channels, 2, 0.2)
+#     def forward(self, cond, x):
+#         cond = self.cond_projection(cond)
+#         x = self.x_projection(x)
+#         tcn_input = torch.cat([cond, x], dim=1)
+#         output = self.tcn(tcn_input)
+#         return output
+    
 class discriminator(nn.Module):
-    def __init__(self, input_size):
-        super(discriminator, self).__init__()
-        self.num_channels = [32, 64, 64, 64, 128, 64, 64, 32]
-        self.tcn = TCN(input_size, 1, self.num_channels, 2, 0.2)
-    def forward(self, x):
-        output = self.tcn(x)
-        return output
+    def __init__(self, cond_dim, x_dim):
+        super().__init__()
+        self.hidden_dim = 16
+        self.cond_projection = nn.Linear(cond_dim, self.hidden_dim)
+        self.x_projection = nn.Linear(x_dim, self.hidden_dim)
+        self.conv1 = nn.Conv1d(self.hidden_dim, 32, kernel_size = 5, stride = 1, padding = 'same')
+        self.conv2 = nn.Conv1d(32, 64, kernel_size = 5, stride = 1, padding = 'same')
+        self.conv3 = nn.Conv1d(64, 128, kernel_size = 5, stride = 1, padding = 'same')
+        self.linear1 = nn.Linear(128*36, 220)
+        self.linear2 = nn.Linear(220, 220)
+        self.linear3 = nn.Linear(220, 1)
+        self.leaky = nn.LeakyReLU(0.01)
+        self.relu = nn.ReLU()
+
+    def forward(self, cond, x):
+        cond = self.cond_projection(cond)
+        x = self.x_projection(x)
+        input = torch.cat([cond, x], dim=1)
+        input = input.transpose(1, 2)
+        conv1 = self.conv1(input)
+        conv1 = self.leaky(conv1)
+        conv2 = self.conv2(conv1)
+        conv2 = self.leaky(conv2)
+        conv3 = self.conv3(conv2)
+        conv3 = self.leaky(conv3)
+        flatten_x =  conv3.reshape(conv3.shape[0], conv3.shape[1]*conv3.shape[2])
+        out_1 = self.linear1(flatten_x)
+        out_1 = self.leaky(out_1)
+        out_2 = self.linear2(out_1)
+        out_2 = self.relu(out_2)
+        out = self.linear3(out_2)
+        return out
