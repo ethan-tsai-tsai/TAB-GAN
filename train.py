@@ -53,6 +53,7 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     cond = X.clone()
     noise = torch.randn(X.shape[0], X.shape[1], noise_dim).to(device)
     X = torch.cat((X, noise), dim=2)
+
     # train discriminator
     for _ in range(5):
         real_data = y.unsqueeze(2)

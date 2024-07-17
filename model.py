@@ -69,14 +69,14 @@ class generator(nn.Module):
         super(generator, self).__init__()
         self.input_size = input_size
         self.device = device
-        self.hidden_layer_size = [1024, 512, 256]
+        self.hidden_layer_size = [512, 256, 128]
         
         # 定義LSTM層的ModuleList
         self.lstm_list = nn.ModuleList(
             [nn.LSTM(input_size if i == 0 else self.hidden_layer_size[i-1], self.hidden_layer_size[i], batch_first=True) 
              for i in range(len(self.hidden_layer_size))]
         )
-        self.tcn = TCN(input_size, 256, [64]*10, 2, 0.2)
+        # self.tcn = TCN(input_size, 256, [64]*10, 2, 0.2)
         self.dropout = nn.Dropout(0.2)
         self.fc = nn.Linear(self.hidden_layer_size[-1], output_size)
     

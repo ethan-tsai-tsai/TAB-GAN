@@ -2,8 +2,57 @@ import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import os
-import random
+import numpy as np
 from datetime import datetime, timedelta
+
+def SMA(data, windows):
+    res = data.rolling(window = windows).mean()
+    return res
+
+def EMA(data, windows):
+    res = data.ewm(span = windows).mean()
+    return res
+
+def MACD(data, long, short, windows):
+    short_ = data.ewm(span = short).mean()
+    long_ = data.ewm(span = long).mean()
+    macd_ = short_ - long_
+    res = macd_.ewm(span = windows).mean()
+    return res
+
+def RSI(data, windows):
+    delta = data.diff(1)
+    up = delta.copy()
+    down = delta.copy()
+    up[up < 0] = 0
+    down[down > 0] = 0
+    avg_up = up.rolling(window=windows, min_periods=1).mean()
+    avg_down = down.rolling(window=windows, min_periods=1).mean()
+    avg_down[avg_down == 0] = 1e-10  # 可以使用任何非常小的值，例如 1e-10
+    rs = avg_up / avg_down
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi
+
+def atr(data_high, data_low, windows):
+    range_ = data_high - data_low
+    res = range_.rolling(window = windows).mean()
+    return res
+
+def bollinger_band(data, windows):
+    sma = data.rolling(window = windows).mean()
+    std = data.rolling(window = windows).std()
+    upper = sma + 2 * std
+    lower = sma - 2 * std
+    return upper, lower
+
+def rsv(data, windows):
+    min_ = data.rolling(window = windows).min()
+    max_ = data.rolling(window = windows).max()
+    range_ = max_ - min_
+    range_[range_ == 0] = np.finfo(float).eps
+    res = (data - min_) / range_ * 100
+    return res
 
 def save_loss_curve(results, args):
     print('Saving loss curve')

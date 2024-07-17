@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
+from utils import *
 
 class StockDataset(Dataset):
     def __init__(self, args, mode='train'):
@@ -37,14 +38,32 @@ class StockDataset(Dataset):
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
         self.complete_data() 
         
-        # 加入日期欄位
+        self.data['y'] = self.data['Close']
+        self.standardize() # 正規化
+        
+        # 加入欄位
+        self.data['7ma'] = EMA(self.data['Close'], 7)
+        self.data['14ma'] = EMA(self.data['Close'], 14)
+        self.data['21ma'] = EMA(self.data['Close'], 21)
+        self.data['7macd'] = MACD(self.data['Close'], 3, 11, 7)
+        self.data['14macd'] = MACD(self.data['Close'], 7, 21, 14)
+        self.data['7rsi'] = RSI(self.data['Close'], 7)
+        self.data['14rsi'] = RSI(self.data['Close'], 14)
+        self.data['21rsi'] = RSI(self.data['Close'], 21)
+        self.data['7atr'] = atr(self.data['High'], self.data['Low'], 7)
+        self.data['14atr'] = atr(self.data['High'], self.data['Low'], 14)
+        self.data['21atr'] = atr(self.data['High'], self.data['Low'], 21)
+        self.data['7upper'], self.data['7lower'] = bollinger_band(self.data['Close'], 7)
+        self.data['14upper'], self.data['14lower'] = bollinger_band(self.data['Close'], 14)
+        self.data['21upper'], self.data['21lower'] = bollinger_band(self.data['Close'], 21)
+        self.data['7rsv'] = rsv(self.data['Close'], 7)
+        self.data['14rsv'] = rsv(self.data['Close'], 14)
+        self.data['21rsv'] = rsv(self.data['Close'], 21)
+        self.data = self.data.iloc[270::, :]
         # self.data['month'] = self.data.index.to_series().dt.month
         # self.data['day'] = self.data.index.to_series().dt.day
         # self.data['hour'] = self.data.index.to_series().dt.hour
         # self.data['minute'] = self.data.index.to_series().dt.minute
-        self.data['y'] = self.data['Close']
-        
-        self.standardize() # 正規化
         
         if mode == 'train':
             self.rolling_window() # 移動窗格
@@ -55,14 +74,23 @@ class StockDataset(Dataset):
         # 防呆
         if self.data.isnull().values.any():
             print('There are missing values in the data.')
+            null_columns = self.data.columns[self.data.isnan().any()]
+            null_data = self.data[null_columns]
+            print(null_data)
             os._exit(0)
 
+        if np.isinf(self.data.values).any():
+            print('There are inf values in the data.')
+            inf_rows = self.data.columns[np.isinf(self.data).any()]
+            inf_data = self.data[inf_rows]
+            print(inf_data)
+            os._exit(0)
         end_time = datetime.now()
         print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
         
     def standardize(self):
-        self.scaler_X = MinMaxScaler()
-        self.scaler_y = MinMaxScaler()
+        self.scaler_X = MinMaxScaler(feature_range=[-1, 1])
+        self.scaler_y = MinMaxScaler(feature_range=[-1, 1])
         col_list = list(self.data.columns)
         col_list.remove('y')
         self.data[col_list] = self.scaler_X.fit_transform(self.data[col_list].values)
