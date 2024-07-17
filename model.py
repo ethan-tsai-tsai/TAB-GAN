@@ -69,7 +69,9 @@ class generator(nn.Module):
         super(generator, self).__init__()
         self.input_size = input_size
         self.device = device
-        self.hidden_layer_size = [512, 256, 128]
+        self.hidden_layer_size = [512, 256, 128
+                                  
+                                  ]
         
         # 定義LSTM層的ModuleList
         self.lstm_list = nn.ModuleList(

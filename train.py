@@ -54,6 +54,8 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     noise = torch.randn(X.shape[0], X.shape[1], noise_dim).to(device)
     X = torch.cat((X, noise), dim=2)
 
+    if torch.isinf(X).any(): print('X has inf values')
+    if torch.isnan(X).any(): print('X has nan values')
     # train discriminator
     for _ in range(5):
         real_data = y.unsqueeze(2)
@@ -61,7 +63,6 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
         if torch.isnan(fake_data).any():
             print('Generated data has nan values. Stop training.')
             os._exit(0)
-        # fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
         gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
         loss_d = discriminator_loss(cond, real_data, fake_data, gradient_penalty)
         optimizer_d.zero_grad()
@@ -70,17 +71,15 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
 
     # train generator
     fake_data = model_g(X)
-    # fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
     loss_g = generator_loss(cond, real_data, fake_data)
-    if not torch.isnan(loss_g).any():
-        optimizer_g.zero_grad()
-        loss_g.backward()
-        optimizer_g.step()
+    optimizer_g.zero_grad()
+    loss_g.backward()
+    optimizer_g.step()
     
     # minimize reconstruction error
     fake_data = model_g(X)
     reconstuction_error = loss_fn(real_data, fake_data)
-    model_g.zero_grad()
+    optimizer_g.zero_grad()
     reconstuction_error.backward()
     optimizer_g.step()
     return loss_d, loss_g    

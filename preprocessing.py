@@ -38,35 +38,24 @@ class StockDataset(Dataset):
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
         self.complete_data() 
         
-        self.data['y'] = self.data['Close']
-        self.standardize() # 正規化
-        
         # 加入欄位
+        self.data = self.data.iloc[::self.time_step, :] # 每 time_step 分鐘取一筆資料
         self.data['7ma'] = EMA(self.data['Close'], 7)
         self.data['14ma'] = EMA(self.data['Close'], 14)
         self.data['21ma'] = EMA(self.data['Close'], 21)
-        self.data['7macd'] = MACD(self.data['Close'], 3, 11, 7)
-        self.data['14macd'] = MACD(self.data['Close'], 7, 21, 14)
-        self.data['7rsi'] = RSI(self.data['Close'], 7)
-        self.data['14rsi'] = RSI(self.data['Close'], 14)
-        self.data['21rsi'] = RSI(self.data['Close'], 21)
-        self.data['7atr'] = atr(self.data['High'], self.data['Low'], 7)
-        self.data['14atr'] = atr(self.data['High'], self.data['Low'], 14)
-        self.data['21atr'] = atr(self.data['High'], self.data['Low'], 21)
         self.data['7upper'], self.data['7lower'] = bollinger_band(self.data['Close'], 7)
         self.data['14upper'], self.data['14lower'] = bollinger_band(self.data['Close'], 14)
         self.data['21upper'], self.data['21lower'] = bollinger_band(self.data['Close'], 21)
-        self.data['7rsv'] = rsv(self.data['Close'], 7)
-        self.data['14rsv'] = rsv(self.data['Close'], 14)
-        self.data['21rsv'] = rsv(self.data['Close'], 21)
-        self.data = self.data.iloc[270::, :]
+        self.data = self.data.iloc[(270 // args.time_step)::, :]
         # self.data['month'] = self.data.index.to_series().dt.month
         # self.data['day'] = self.data.index.to_series().dt.day
         # self.data['hour'] = self.data.index.to_series().dt.hour
         # self.data['minute'] = self.data.index.to_series().dt.minute
         
-        if mode == 'train':
-            self.rolling_window() # 移動窗格
+        self.data['y'] = self.data['Close']
+        self.standardize() # 正規化
+        
+        self.data['change'] = price_change(self.data['Close'])
         
         # 取得資訊
         self.num_features = len(self.data.drop('y', axis=1).columns) # 特徵數量
@@ -74,17 +63,19 @@ class StockDataset(Dataset):
         # 防呆
         if self.data.isnull().values.any():
             print('There are missing values in the data.')
-            null_columns = self.data.columns[self.data.isnan().any()]
-            null_data = self.data[null_columns]
-            print(null_data)
-            os._exit(0)
+            # null_columns = self.data.columns[self.data.isnull().any()]
+            # null_data = self.data[null_columns]
+            # print(null_data)
+            # os._exit(0)
 
         if np.isinf(self.data.values).any():
             print('There are inf values in the data.')
-            inf_rows = self.data.columns[np.isinf(self.data).any()]
-            inf_data = self.data[inf_rows]
-            print(inf_data)
-            os._exit(0)
+            # inf_rows = self.data.columns[np.isinf(self.data).any()]
+            # inf_data = self.data[inf_rows]
+            # print(inf_data)
+            # os._exit(0)
+        
+        if mode == 'train': self.rolling_window() # 移動窗格
         end_time = datetime.now()
         print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
         
@@ -127,12 +118,10 @@ class StockDataset(Dataset):
             self.complete_data()
         
     def rolling_window(self):
-        self.data = self.data.iloc[::self.time_step, :]
         self.X, self.y = [], []
         for i in range(0, len(self.data) - self.seq_len - self.target_length, self.window_stride):
             self.X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)
             self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 只取最後
-            # self.y.append(self.data.iloc[i:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 取X天數+最後
 
     def get_data(self, date, days):
         X, y= [], []
