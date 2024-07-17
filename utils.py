@@ -67,7 +67,7 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     for i in range(len(y_preds)):
         plt.plot(range(i*args.window_stride, i*args.window_stride+target_length), y_preds[i], color=colors[6+i])
     if y_true is not None:
-        plt.plot(range(seq_unit*(args.num_days-1)+target_length), y_true, color='black', label='real')
+        plt.plot(range(len(y_true)), y_true, color='black', label='real')
 
     plt.legend()
     plt.xticks(x_ticks, x_labels, rotation=15)
