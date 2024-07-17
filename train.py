@@ -76,6 +76,12 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
         loss_g.backward()
         optimizer_g.step()
     
+    # minimize reconstruction error
+    fake_data = model_g(X)
+    reconstuction_error = loss_fn(real_data, fake_data)
+    model_g.zero_grad()
+    reconstuction_error.backward()
+    optimizer_g.step()
     return loss_d, loss_g    
 
 def test_iter(test_loader, model_d, model_g, device, args):
@@ -152,12 +158,11 @@ if __name__ == '__main__':
     noise_dim = args.noise_dim
     # model setting
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
-    model_d = discriminator(stock_data.num_features, 1)
+    model_d = discriminator(stock_data.num_features, 1, args)
     model_g = generator(stock_data.num_features + noise_dim, stock_data.target_length, device)
     optimizer_d = torch.optim.Adam(model_d.parameters(), lr=args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
     optimizer_g = torch.optim.Adam(model_g.parameters(), lr=args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
-    # loss_fn = nn.SmoothL1Loss(reduction='sum')
-    loss_fn = nn.MSELoss(reduction='sum')
+    loss_fn = nn.L1Loss()
     # train model
     print('------------------------------------------------------------------------------------------------')
     print(f'Start training {args.name}')

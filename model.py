@@ -69,14 +69,14 @@ class generator(nn.Module):
         super(generator, self).__init__()
         self.input_size = input_size
         self.device = device
-        self.hidden_layer_size = [64, 128, 64]
+        self.hidden_layer_size = [1024, 512, 256]
         
         # 定義LSTM層的ModuleList
         self.lstm_list = nn.ModuleList(
             [nn.LSTM(input_size if i == 0 else self.hidden_layer_size[i-1], self.hidden_layer_size[i], batch_first=True) 
              for i in range(len(self.hidden_layer_size))]
         )
-        
+        self.tcn = TCN(input_size, 256, [64]*10, 2, 0.2)
         self.dropout = nn.Dropout(0.2)
         self.fc = nn.Linear(self.hidden_layer_size[-1], output_size)
     
@@ -86,6 +86,7 @@ class generator(nn.Module):
             c0 = torch.zeros(1, x.size(0), self.hidden_layer_size[i]).to(self.device)
             out, _ = self.lstm_list[i](x, (h0, c0))
             x = self.dropout(out)
+        # out = self.tcn(x)
         
         out = out[:, -1, :]  # 取出最後一個時間步的輸出
         out = self.fc(out)
@@ -96,38 +97,30 @@ class generator(nn.Module):
 # class discriminator(nn.Module):
 #     def __init__(self, cond_dim, x_dim):
 #         super(discriminator, self).__init__()
-#         self.hidden_dim = 16
-#         self.cond_projection = nn.Linear(cond_dim, self.hidden_dim)
-#         self.x_projection = nn.Linear(x_dim, self.hidden_dim)
 #         self.num_channels = [32, 32, 32, 32, 32, 32, 32, 32]
-#         self.tcn = TCN(self.hidden_dim, 1, self.num_channels, 2, 0.2)
+#         self.tcn = TCN(1, 1, self.num_channels, 2, 0.2)
 #     def forward(self, cond, x):
-#         cond = self.cond_projection(cond)
-#         x = self.x_projection(x)
-#         tcn_input = torch.cat([cond, x], dim=1)
-#         output = self.tcn(tcn_input)
+#         cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
+#         input = torch.cat([cond, x], axis=1).unsqueeze(2)
+#         output = self.tcn(input)
 #         return output
     
 class discriminator(nn.Module):
-    def __init__(self, cond_dim, x_dim):
+    def __init__(self, cond_dim, x_dim, args):
         super().__init__()
-        self.hidden_dim = 16
-        self.cond_projection = nn.Linear(cond_dim, self.hidden_dim)
-        self.x_projection = nn.Linear(x_dim, self.hidden_dim)
-        self.conv1 = nn.Conv1d(self.hidden_dim, 32, kernel_size = 5, stride = 1, padding = 'same')
+        target_length = 270 // args.time_step
+        self.conv1 = nn.Conv1d(1, 32, kernel_size = 5, stride = 1, padding = 'same')
         self.conv2 = nn.Conv1d(32, 64, kernel_size = 5, stride = 1, padding = 'same')
         self.conv3 = nn.Conv1d(64, 128, kernel_size = 5, stride = 1, padding = 'same')
-        self.linear1 = nn.Linear(128*36, 220)
-        self.linear2 = nn.Linear(220, 220)
-        self.linear3 = nn.Linear(220, 1)
+        self.linear1 = nn.Linear(128*(target_length*(cond_dim)*args.window_size+x_dim*target_length), 256)
+        self.linear2 = nn.Linear(256, 256)
+        self.linear3 = nn.Linear(256, 1)
         self.leaky = nn.LeakyReLU(0.01)
         self.relu = nn.ReLU()
 
     def forward(self, cond, x):
-        cond = self.cond_projection(cond)
-        x = self.x_projection(x)
-        input = torch.cat([cond, x], dim=1)
-        input = input.transpose(1, 2)
+        cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
+        input = torch.cat([cond, x], axis=1).unsqueeze(1)
         conv1 = self.conv1(input)
         conv1 = self.leaky(conv1)
         conv2 = self.conv2(conv1)
