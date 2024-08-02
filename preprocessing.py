@@ -47,14 +47,17 @@ class StockDataset(Dataset):
         self.data['14upper'], self.data['14lower'] = bollinger_band(self.data['Close'], 14)
         self.data['21upper'], self.data['21lower'] = bollinger_band(self.data['Close'], 21)
         self.data = self.data.iloc[(270 // args.time_step)::, :]
-        # self.data['month'] = self.data.index.to_series().dt.month
-        # self.data['day'] = self.data.index.to_series().dt.day
-        # self.data['hour'] = self.data.index.to_series().dt.hour
-        # self.data['minute'] = self.data.index.to_series().dt.minute
         
         self.data['y'] = self.data['Close']
         self.standardize() # 正規化
         
+        # Date Columns
+        self.data['month'] = self.data.index.to_series().dt.month
+        self.data['day'] = self.data.index.to_series().dt.day
+        self.data['hour'] = self.data.index.to_series().dt.hour
+        self.data['minute'] = self.data.index.to_series().dt.minute
+        
+        # Price change
         self.data['change'] = price_change(self.data['Close'])
         
         # 取得資訊
@@ -74,6 +77,9 @@ class StockDataset(Dataset):
             # inf_data = self.data[inf_rows]
             # print(inf_data)
             # os._exit(0)
+        columns = [col for col in self.data.columns if col != 'y'] + ['y'] # 重新排列欄位順序
+        self.data = self.data[columns]
+
         
         if mode == 'train': self.rolling_window() # 移動窗格
         end_time = datetime.now()
