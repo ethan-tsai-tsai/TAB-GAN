@@ -9,13 +9,13 @@ from utils import *
 from arguments import *
 import pykalman
 
-def predict(model_g, device, X, y=None):
+def predict(args, model_g, device, X, y=None):
     model_g.to(device)
     model_g.eval()
     with torch.inference_mode():
-        X = X.to(device)
-        X = X.unsqueeze(0)
-        y_pred = model_g(X).cpu().detach().tolist() # 輸出為三維
+        X = X.unsqueeze(0).to(device)
+        noise = torch.randn(X.shape[0], args.noise_dim).to(device)
+        y_pred = model_g(X, noise).cpu().detach().tolist() # 輸出為三維
         y_pred = np.array(y_pred).flatten()
         if y is not None: y_true = y.cpu().detach().numpy()
         else: y_true = None
@@ -27,12 +27,10 @@ def prepare_eval_data(model_g, stock_data, device, date, args):
     # add noise
     X, y = X.to(device), y.to(device)
     y = y.unsqueeze(2)
-    noise = torch.randn(X.shape[0],X.shape[1], args.noise_dim).to(device)
-    X = torch.cat((X, noise), dim=2)
     y_preds = []
     y_trues = []
     for i in range(X.shape[0]):
-        y_pred, y_true = predict(model_g, device, X[i], y[i])
+        y_pred, y_true = predict(args, model_g, device, X[i], y[i])
         y_true = stock_data.scaler_y.inverse_transform(y_true)
         y_pred = stock_data.scaler_y.inverse_transform([y_pred])[0]
         y_preds.append(y_pred)

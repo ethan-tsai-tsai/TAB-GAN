@@ -12,31 +12,31 @@ from utils import *
 from arguments import *
 from eval import *
 
-# def compute_gradient_penalty(cond, real_data, fake_data):
-#     batch_size = real_data.size()[0]
+def compute_gradient_penalty(cond, real_data, fake_data):
+    batch_size = real_data.size()[0]
 
-#     # Calculate interpolation
-#     alpha = torch.rand(batch_size, 1, 1)
-#     alpha = alpha.expand_as(real_data).to(device)
-#     interpolated = alpha * real_data.data + (1 - alpha) * fake_data.data
-#     interpolated = torch.autograd.Variable(interpolated, requires_grad=True).to(device)
+    # Calculate interpolation
+    alpha = torch.rand(batch_size, 1, 1)
+    alpha = alpha.expand_as(real_data).to(device)
+    interpolated = alpha * real_data.data + (1 - alpha) * fake_data.data
+    interpolated = torch.autograd.Variable(interpolated, requires_grad=True).to(device)
 
-#     # Calculate probability of interpolated examples
-#     prob_interpolated = model_d(cond, interpolated)
+    # Calculate probability of interpolated examples
+    prob_interpolated = model_d(cond, interpolated)
 
-#     # Calculate gradients of probabilities with respect to examples
-#     gradients = torch.autograd.grad(
-#         outputs=prob_interpolated,
-#         inputs=interpolated,
-#         grad_outputs=torch.ones(prob_interpolated.size(), device=device),
-#         create_graph=True,
-#         retain_graph=True,
-#         only_inputs=True
-#     )[0]
+    # Calculate gradients of probabilities with respect to examples
+    gradients = torch.autograd.grad(
+        outputs=prob_interpolated,
+        inputs=interpolated,
+        grad_outputs=torch.ones(prob_interpolated.size(), device=device),
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True
+    )[0]
 
-#     gradients = gradients.view(batch_size, -1)
-#     gradients_norm = torch.sqrt(torch.sum(gradients ** 2, dim=1) + 1e-12)
-#     return 10 * ((gradients_norm - 1) ** 2).mean()
+    gradients = gradients.view(batch_size, -1)
+    gradients_norm = torch.sqrt(torch.sum(gradients ** 2, dim=1) + 1e-12)
+    return 10 * ((gradients_norm - 1) ** 2).mean()
 
 def generator_loss(cond, real_data, fake_data):
     return -torch.mean(model_d(cond, fake_data))
@@ -54,7 +54,7 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
 
     if torch.isinf(X).any(): print('X has inf values')
     if torch.isnan(X).any(): print('X has nan values')
-    noise = torch.randn(X.shape[0], noise_dim).to(device)
+    noise = torch.randn(X.shape[0], args.noise_dim).to(device)
     # train discriminator
     for _ in range(2):
         real_data = y.unsqueeze(2)
@@ -62,14 +62,15 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
         if torch.isnan(fake_data).any():
             print('Generated data has nan values. Stop training.')
             os._exit(0)
-        # gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
-        loss_d = discriminator_loss(cond, real_data, fake_data, 0)
+        gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
+        loss_d = discriminator_loss(cond, real_data, fake_data, gradient_penalty)
         optimizer_d.zero_grad()
         loss_d.backward()
         optimizer_d.step()
 
     # train generator
-    fake_data = model_g(X)
+    noise = torch.randn(X.shape[0], args.noise_dim).to(device)
+    fake_data = model_g(X, noise)
     loss_g = generator_loss(cond, real_data, fake_data)
     optimizer_g.zero_grad()
     loss_g.backward()
@@ -81,7 +82,7 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     # optimizer_g.zero_grad()
     # reconstuction_error.backward()
     # optimizer_g.step()
-    # return loss_d, loss_g    
+    return loss_d, loss_g    
 
 def test_iter(test_loader, model_d, model_g, device, args):
     with torch.inference_mode():
@@ -91,20 +92,18 @@ def test_iter(test_loader, model_d, model_g, device, args):
             X, y = X.to(device), y.to(device)
             cond = X.clone()
             # add noise
-            noise = torch.randn(X.shape[0], X.shape[1], noise_dim).to(device)
-            X = torch.cat((X, noise), dim=2)
             model_g.eval()
             model_d.eval()
             # evaluate discriminator
             real_data = y.unsqueeze(2)
-            fake_data = model_g(X)
-            # fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
+            noise = torch.randn(X.shape[0], args.noise_dim).to(device)
+            fake_data = model_g(X, noise)
             loss_d = discriminator_loss(cond, real_data, fake_data)
             total_loss_d += loss_d.cpu().detach().numpy()
             
             # evaluate generator
-            fake_data = model_g(X)
-            # fake_data = torch.cat((real_data[:, :stock_data.seq_len], fake_data), dim=1) # fake data 加上前面的 real data
+            noise = torch.randn(X.shape[0], args.noise_dim).to(device)
+            fake_data = model_g(X, noise)
             loss_g = generator_loss(cond ,real_data, fake_data)
             total_loss_g += loss_g.cpu().detach().numpy()
     return total_loss_d, total_loss_g
