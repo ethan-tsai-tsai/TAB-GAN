@@ -99,6 +99,7 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     return loss_d, loss_g    
 
 def test_iter(test_loader, model_d, model_g, device, args):
+    global BEST_KLD
     with torch.inference_mode():
         model_d, model_g = model_d.to(device), model_g.to(device)
         total_loss_d, total_loss_g = 0, 0
@@ -120,6 +121,17 @@ def test_iter(test_loader, model_d, model_g, device, args):
             fake_data = model_g(X, noise)
             loss_g = generator_loss(cond ,real_data, fake_data)
             total_loss_g += loss_g.cpu().detach().numpy()
+            
+            kld = calc_kld(fake_data.cpu().detach().numpy(), real_data.cpu().detach().numpy(), 100, 0, 1)
+            if kld < BEST_KLD and kld != np.inf:
+                BEST_KLD = kld
+                torch.save({
+                    'args': args,
+                    'model_d': model_d.state_dict(),
+                    'model_g': model_g.state_dict()
+                }, f'./model/{args.stock}_{args.name}_best.pth')
+                print(f'update best model with kld = {kld}')
+                
     return total_loss_d, total_loss_g
 
 def train(train_loader, test_loader, model_d, model_g, optimizer_d, optimizer_g, device, args):
@@ -158,7 +170,7 @@ if __name__ == '__main__':
     if not os.path.exists(f'logs/{FOLDER_NAME}'):os.makedirs(f'logs/{FOLDER_NAME}')
     else: clear_folder(f'logs/{FOLDER_NAME}')
     writer = SummaryWriter(log_dir=f'logs/{FOLDER_NAME}')
-    
+    BEST_KLD = np.inf
     # Prepare train and test data
     stock_data = StockDataset(args)
     split_idx = int(round(len(stock_data)*0.9))

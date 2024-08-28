@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--num_val', type=int, default=2, help='每次驗證需要的筆數')
     
     # Evaluation
-    parser.add_argument('--num_days', type=int, default=5, help='單張折線圖中的天數')
+    parser.add_argument('--num_days', type=int, default=30, help='單張折線圖中的天數')
     parser.add_argument('--num_eval', type=int , default=10, help='要評估的折線圖數量')
     
     args = parser.parse_args()

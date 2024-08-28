@@ -74,7 +74,7 @@ class generator(nn.Module):
     def __init__(self, condition_size, noise_size, output_size, device):
         super(generator, self).__init__()
         self.device = device
-        self.hidden_layer_size = [64]
+        self.hidden_layer_size = [128]
         
         # 定義LSTM層的ModuleList
         self.lstm_list = nn.ModuleList(
@@ -104,7 +104,7 @@ class generator(nn.Module):
 class discriminator(nn.Module):
     def __init__(self, cond_dim, x_dim, device, args):
         super(discriminator, self).__init__()
-        num_channels = [8]*4
+        num_channels = [4]*4
         input_size = 1
         self.device = device
         self.tcn = TemporalConvNet(input_size, num_channels, 2, 0.1)

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 from datetime import datetime, timedelta
+from random import choice
 
 def SMA(data, windows):
     res = data.rolling(window = windows).mean()
@@ -26,6 +27,20 @@ def price_change(data):
         change = (data[i] - data[i - 1]) / data[i - 1] * 100
         changes.append(change)
     return changes
+
+def calc_kld(generated_data, ground_truth, bins, range_min, range_max):
+    pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True, range=(range_min, range_max))
+    pd_gen, _ = np.histogram(generated_data, bins=bins, density=True, range=(range_min, range_max))
+    kld = 0
+    for x1, x2 in zip(pd_gt, pd_gen):
+        if x1 != 0 and x2 == 0:
+            kld += x1
+        elif x1 == 0 and x2 != 0:
+            kld += x2
+        elif x1 != 0 and x2 != 0:
+            kld += x1 * np.log(x1 / x2)
+
+    return np.abs(kld)
 
 def save_loss_curve(results, args):
     print('Saving loss curve')
@@ -86,13 +101,14 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     # plot
     plt.figure(figsize=(20, 10))
     plt.grid(True)
+
     for i in range(len(y_preds)):
-        plt.plot(range(i*args.window_stride, i*args.window_stride+target_length), y_preds[i], color=colors[6+i])
+        plt.plot(range(i*args.window_stride, i*args.window_stride+target_length), y_preds[i], color=choice(colors))
     if y_true is not None:
         plt.plot(range(len(y_true)), y_true, color='black', label='real')
 
     plt.legend()
-    plt.xticks(x_ticks, x_labels, rotation=15)
+    # plt.xticks(x_ticks, x_labels, rotation=15)
     plt.title(f'{dates[0]} - {dates[-1]}')
     plt.xlabel('Time')
     plt.ylabel('Stock Price')
