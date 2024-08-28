@@ -48,7 +48,7 @@ if __name__ == '__main__':
     FILE_NAME = f'{args.stock}_{args.name}'
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
     stock_data = StockDataset(args, mode='test')
-    model_g = generator(stock_data.num_features + args.noise_dim, stock_data.target_length, device)
+    model_g = generator(stock_data.num_features, args.noise_dim, stock_data.target_length, device)
     model_cp = torch.load(f'./model/{FILE_NAME}.pth')
     model_g.load_state_dict(model_cp['model_g'])
     

@@ -56,7 +56,7 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     if torch.isnan(X).any(): print('X has nan values')
     noise = torch.randn(X.shape[0], args.noise_dim).to(device)
     # train discriminator
-    for _ in range(2):
+    for _ in range(3):
         real_data = y.unsqueeze(2)
         fake_data = model_g(cond, noise)
         if torch.isnan(fake_data).any():
@@ -76,12 +76,26 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     loss_g.backward()
     optimizer_g.step()
     
-    # minimize reconstruction error
-    # fake_data = model_g(X)
-    # reconstuction_error = loss_fn(real_data, fake_data)
-    # optimizer_g.zero_grad()
-    # reconstuction_error.backward()
-    # optimizer_g.step()
+    for _ in range(3):
+        real_data = y.unsqueeze(2)
+        fake_data = model_g(cond, noise)
+        if torch.isnan(fake_data).any():
+            print('Generated data has nan values. Stop training.')
+            os._exit(0)
+        gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
+        loss_d = discriminator_loss(cond, real_data, fake_data, gradient_penalty)
+        optimizer_d.zero_grad()
+        loss_d.backward()
+        optimizer_d.step()
+    
+    # minimize mean absolute error
+    noise = torch.randn(X.shape[0], args.noise_dim).to(device)
+    fake_data = model_g(X, noise)
+    reconstuction_error = loss_fn(real_data, fake_data)
+    optimizer_g.zero_grad()
+    reconstuction_error.backward()
+    optimizer_g.step()
+    
     return loss_d, loss_g    
 
 def test_iter(test_loader, model_d, model_g, device, args):
@@ -160,7 +174,7 @@ if __name__ == '__main__':
     model_g = generator(stock_data.num_features, noise_dim, stock_data.target_length, device)
     optimizer_d = torch.optim.Adam(model_d.parameters(), lr=args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
     optimizer_g = torch.optim.Adam(model_g.parameters(), lr=args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
-    loss_fn = nn.BCELoss()
+    loss_fn = nn.L1Loss()
     # train model
     print('------------------------------------------------------------------------------------------------')
     print(f'Start training {args.name}')

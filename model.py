@@ -18,11 +18,11 @@ class TemporalBlock(nn.Module):
         self.net = nn.Sequential(
             self.conv1,
             Chomp1d(padding),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Dropout(dropout),
             self.conv2,
             Chomp1d(padding),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Dropout(dropout)            
         )
         self.downsample = nn.Conv1d(n_inputs, n_outputs, 1) if n_inputs != n_outputs else None
@@ -82,7 +82,11 @@ class generator(nn.Module):
              for i in range(len(self.hidden_layer_size))]
         )
         self.dropout = nn.Dropout(0.2)
-        self.fc = nn.Linear(self.hidden_layer_size[-1]+noise_size, output_size)
+        self.fc = nn.Sequential(
+            nn.Linear(self.hidden_layer_size[-1]+noise_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, output_size)
+        )
     
     def forward(self, cond, noise):
         for i in range(len(self.lstm_list)):
