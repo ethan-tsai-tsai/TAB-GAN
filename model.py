@@ -118,7 +118,7 @@ class discriminator(nn.Module):
         cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
         input = torch.cat([cond, x], axis=1).unsqueeze(1)
         out = self.tcn(input)
-        weight = torch.exp(torch.linspace(0, -5, out.shape[2])).to(self.device)
+        weight = torch.exp(torch.linspace(0, -3, out.shape[2])).to(self.device)
         out = out * weight
         out = self.linear(out.transpose(1, 2))
         

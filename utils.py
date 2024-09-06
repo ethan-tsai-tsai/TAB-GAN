@@ -90,7 +90,7 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     plt.title(f'{dates[0]} - {dates[-1]}')
     plt.xlabel('Time')
     plt.ylabel('Stock Price')
-    plt.savefig(f'{path}/{args.stock}_{args.name}/{file_name}.png')
+    plt.savefig(f'{path}/{file_name}.png')
     # print(f'Svaving prediction: {dates[-1]}')
     plt.close()
 
@@ -104,7 +104,7 @@ def save_dist_plot(args, path, file_name, dates, y_preds, y_true):
     plt.title(f'{dates[0]} - {dates[-1]}')
     plt.xlabel('stock price (x)')
     plt.ylabel('p(x)')
-    plt.savefig(f'{path}/{args.stock}_{args.name}/{file_name}.png')
+    plt.savefig(f'{path}/{file_name}.png')
     plt.close()
 
 def clear_folder(folder_path):

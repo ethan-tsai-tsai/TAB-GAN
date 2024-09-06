@@ -77,25 +77,25 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
     loss_g.backward()
     optimizer_g.step()
     
-    for _ in range(3):
-        real_data = y.unsqueeze(2)
-        fake_data = model_g(cond, noise)
-        if torch.isnan(fake_data).any():
-            print('Generated data has nan values. Stop training.')
-            os._exit(0)
-        gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
-        loss_d = discriminator_loss(model_d, cond, real_data, fake_data, gradient_penalty)
-        optimizer_d.zero_grad()
-        loss_d.backward()
-        optimizer_d.step()
+    # for _ in range(3):
+    #     real_data = y.unsqueeze(2)
+    #     fake_data = model_g(cond, noise)
+    #     if torch.isnan(fake_data).any():
+    #         print('Generated data has nan values. Stop training.')
+    #         os._exit(0)
+    #     gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
+    #     loss_d = discriminator_loss(model_d, cond, real_data, fake_data, gradient_penalty)
+    #     optimizer_d.zero_grad()
+    #     loss_d.backward()
+    #     optimizer_d.step()
     
-    # minimize mean absolute error
-    noise = torch.randn(X.shape[0], args.noise_dim).to(device)
-    fake_data = model_g(X, noise)
-    reconstuction_error = loss_fn(real_data, fake_data)
-    optimizer_g.zero_grad()
-    reconstuction_error.backward()
-    optimizer_g.step()
+    # # minimize mean absolute error
+    # noise = torch.randn(X.shape[0], args.noise_dim).to(device)
+    # fake_data = model_g(X, noise)
+    # reconstuction_error = loss_fn(real_data, fake_data)
+    # optimizer_g.zero_grad()
+    # reconstuction_error.backward()
+    # optimizer_g.step()
     
     return loss_d, loss_g    
 
@@ -160,7 +160,9 @@ def train(train_loader, test_loader, model_d, model_g, optimizer_d, optimizer_g,
             print(f'Epoch: {epoch+1}/{args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
             for date in val_dates:
                 val_date, y_preds, y_trues = prepare_eval_data(model_g, stock_data, device, date, args)
-                save_predict_plot(args, './logs', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
+                save_predict_plot(args, f'./logs/{FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
+                dist_eval_date, dist_y_preds, dist_y_trues = prepare_eval_data(model_g, stock_data, device, date, args, pred_times=10)
+                save_dist_plot(args, f'./logs/{FOLDER_NAME}/dist', f'{val_date[-1]}_epoch{epoch+1}', dist_eval_date, dist_y_preds, dist_y_trues)
     return results
             
 if __name__ == '__main__':
@@ -170,6 +172,11 @@ if __name__ == '__main__':
     FOLDER_NAME = f'{args.stock}_{args.name}'
     if not os.path.exists(f'logs/{FOLDER_NAME}'):os.makedirs(f'logs/{FOLDER_NAME}')
     else: clear_folder(f'logs/{FOLDER_NAME}')
+    if not os.path.exists(f'./logs/{FOLDER_NAME}/pred'): os.makedirs(f'./logs/{FOLDER_NAME}/pred')
+    if not os.path.exists(f'./logs/{FOLDER_NAME}/dist'): os.makedirs(f'./logs/{FOLDER_NAME}/dist')
+    clear_folder(f'./logs/{FOLDER_NAME}/pred')
+    clear_folder(f'./logs/{FOLDER_NAME}/dist')
+    
     writer = SummaryWriter(log_dir=f'logs/{FOLDER_NAME}')
     BEST_KLD = np.inf
     # Prepare train and test data
