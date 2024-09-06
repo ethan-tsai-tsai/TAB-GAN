@@ -9,18 +9,6 @@ from utils import *
 from arguments import *
 import pykalman
 
-def predict(args, model_g, device, X, y=None):
-    model_g.to(device)
-    model_g.eval()
-    with torch.inference_mode():
-        X = X.unsqueeze(0).to(device)
-        noise = torch.randn(X.shape[0], args.noise_dim).to(device)
-        y_pred = model_g(X, noise).cpu().detach().tolist() # 輸出為三維
-        y_pred = np.array(y_pred).flatten()
-        if y is not None: y_true = y.cpu().detach().numpy()
-        else: y_true = None
-        return y_pred, y_true
-
 def prepare_eval_data(model_g, stock_data, device, date, args):
     eval_date = stock_data.time_intervals[stock_data.time_intervals.index(date):stock_data.time_intervals.index(date)+5]
     X, y = stock_data.get_data(date, days=args.num_days)
@@ -30,13 +18,21 @@ def prepare_eval_data(model_g, stock_data, device, date, args):
     y_preds = []
     y_trues = []
     for i in range(X.shape[0]):
-        y_pred, y_true = predict(args, model_g, device, X[i], y[i])
+        model_g.to(device)
+        model_g.eval()
+        with torch.inference_mode():
+            X = X.unsqueeze(0).to(device)
+            noise = torch.randn(X.shape[0], args.noise_dim).to(device)
+            y_pred = model_g(X, noise).cpu().detach().tolist() # 輸出為三維
+            y_pred = np.array(y_pred).flatten()
+            if y is not None: y_true = y.cpu().detach().numpy()
+            else: y_true = None
         y_true = stock_data.scaler_y.inverse_transform(y_true)
         y_pred = stock_data.scaler_y.inverse_transform([y_pred])[0]
         y_preds.append(y_pred)
     
         # 處理 y_true
-        if i == 0: 
+        if i == 0 and y_true is not None: 
             y_trues = np.concatenate((y_trues, y_true.flatten()))
         else: 
             y_trues = np.concatenate((y_trues, y_true.flatten()[len(y_true)-args.window_stride:len(y_true)]))

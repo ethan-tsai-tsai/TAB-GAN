@@ -94,6 +94,12 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     # print(f'Svaving prediction: {dates[-1]}')
     plt.close()
 
+def save_dist_plot(args, path, file_name, dates, y_preds, y_true):
+    plt.figure(figsize=(10, 10))
+    for i in range(len(y_preds)):
+        plt.hist()
+    
+
 def clear_folder(folder_path):
     # 確保資料夾存在
     if not os.path.exists(folder_path):
