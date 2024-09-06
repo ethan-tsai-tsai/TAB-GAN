@@ -117,7 +117,11 @@ class discriminator(nn.Module):
     def forward(self, cond, x, channel_last=True):
         cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
         input = torch.cat([cond, x], axis=1).unsqueeze(1)
-        y = self.tcn(input)
-        return self.linear(y.transpose(1, 2))
+        out = self.tcn(input)
+        weight = torch.exp(torch.linspace(0, -5, out.shape[2])).to(self.device)
+        out = out * weight
+        out = self.linear(out.transpose(1, 2))
+        
+        return out
     
     
