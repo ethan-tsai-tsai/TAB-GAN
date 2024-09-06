@@ -82,10 +82,10 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
 
     for i in range(len(y_preds)):
         plt.plot(range(i*args.window_stride, i*args.window_stride+target_length), y_preds[i], color=choice(colors))
-    if y_true is not None:
-        plt.plot(range(len(y_true)), y_true, color='black', label='real')
+        if y_true is not None:
+            plt.plot(range(i*args.window_stride, i*args.window_stride+len(y_true[i])), y_true[i], color='black', label='real')
 
-    plt.legend()
+    # plt.legend()
     # plt.xticks(x_ticks, x_labels, rotation=15)
     plt.title(f'{dates[0]} - {dates[-1]}')
     plt.xlabel('Time')
@@ -95,10 +95,17 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     plt.close()
 
 def save_dist_plot(args, path, file_name, dates, y_preds, y_true):
-    plt.figure(figsize=(10, 10))
-    for i in range(len(y_preds)):
-        plt.hist()
+    y_true = np.array(y_true).flatten()
+    y_preds = np.array(y_preds).flatten()
     
+    plt.figure(figsize=(10, 10))
+    plt.hist(y_preds, bins='auto', density=True, alpha=0.5, color='green')
+    plt.hist(y_true, bins='auto', density=True, alpha=0.5, color='red')
+    plt.title(f'{dates[0]} - {dates[-1]}')
+    plt.xlabel('stock price (x)')
+    plt.ylabel('p(x)')
+    plt.savefig(f'{path}/{args.stock}_{args.name}/{file_name}.png')
+    plt.close()
 
 def clear_folder(folder_path):
     # 確保資料夾存在
