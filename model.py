@@ -84,7 +84,7 @@ class generator(nn.Module):
         self.dropout = nn.Dropout(0.2)
         self.fc = nn.Sequential(
             nn.Linear(self.hidden_layer_size[-1]+noise_size, 256),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(256, output_size)
         )
     
@@ -92,10 +92,10 @@ class generator(nn.Module):
         for i in range(len(self.lstm_list)):
             h0 = torch.zeros(1, cond.size(0), self.hidden_layer_size[i]).to(self.device)
             c0 = torch.zeros(1, cond.size(0), self.hidden_layer_size[i]).to(self.device)
-            cond_latent, _ = self.lstm_list[i](cond, (h0, c0))
-            # cond = self.dropout(cond_latent)
+            cond, _ = self.lstm_list[i](cond, (h0, c0))
+            # cond = self.dropout(cond)
         
-        cond_latent = cond_latent[:, -1, :]  # 取出最後一個時間步的輸出
+        cond_latent = cond[:, -1, :]  # 取出最後一個時間步的輸出
         fc_input = torch.cat((cond_latent, noise), dim=1)
         out = self.fc(fc_input)
         out = out.unsqueeze(2)
@@ -104,7 +104,7 @@ class generator(nn.Module):
 class discriminator(nn.Module):
     def __init__(self, cond_dim, x_dim, device, args):
         super(discriminator, self).__init__()
-        num_channels = [4]*4
+        num_channels = [8]*8
         input_size = 1
         self.device = device
         self.tcn = TemporalConvNet(input_size, num_channels, 2, 0.1)

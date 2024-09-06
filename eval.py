@@ -60,7 +60,7 @@ if __name__ == '__main__':
     # 清空資料夾內容
     if not os.path.exists(f'./img/pred/{FILE_NAME}'): os.makedirs(f'./img/pred/{FILE_NAME}')
     clear_folder(f'./img/pred/{FILE_NAME}')
-    eval_dates = random.sample(stock_data.time_intervals, args.num_eval)
+    eval_dates = random.sample(stock_data.time_intervals[args.num_days : -args.num_days], args.num_eval)
     for date in eval_dates:
         eval_date, y_preds, y_trues = prepare_eval_data(model_g, stock_data, device, date, args)
         save_predict_plot(args, './img/pred', f'pred_{eval_date[-1]}', eval_date, y_preds, y_trues)

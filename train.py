@@ -11,6 +11,7 @@ from model import *
 from utils import *
 from arguments import *
 from eval import *
+# 改 2 小時
 
 def compute_gradient_penalty(cond, real_data, fake_data):
     batch_size = real_data.size()[0]
@@ -41,7 +42,7 @@ def compute_gradient_penalty(cond, real_data, fake_data):
 def generator_loss(cond, real_data, fake_data):
     return -torch.mean(model_d(cond, fake_data))
 
-def discriminator_loss(cond, real_data, fake_data, gradient_penalty=0):
+def discriminator_loss(model_d, cond, real_data, fake_data, gradient_penalty=0):
     return -torch.mean(model_d(cond, real_data)) + torch.mean(model_d(cond, fake_data)) + gradient_penalty
 
 def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
@@ -63,7 +64,7 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
             print('Generated data has nan values. Stop training.')
             os._exit(0)
         gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
-        loss_d = discriminator_loss(cond, real_data, fake_data, gradient_penalty)
+        loss_d = discriminator_loss(model_d, cond, real_data, fake_data, gradient_penalty)
         optimizer_d.zero_grad()
         loss_d.backward()
         optimizer_d.step()
@@ -83,7 +84,7 @@ def train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args):
             print('Generated data has nan values. Stop training.')
             os._exit(0)
         gradient_penalty = compute_gradient_penalty(cond, real_data, fake_data)
-        loss_d = discriminator_loss(cond, real_data, fake_data, gradient_penalty)
+        loss_d = discriminator_loss(model_d, cond, real_data, fake_data, gradient_penalty)
         optimizer_d.zero_grad()
         loss_d.backward()
         optimizer_d.step()
@@ -113,7 +114,7 @@ def test_iter(test_loader, model_d, model_g, device, args):
             real_data = y.unsqueeze(2)
             noise = torch.randn(X.shape[0], args.noise_dim).to(device)
             fake_data = model_g(X, noise)
-            loss_d = discriminator_loss(cond, real_data, fake_data)
+            loss_d = discriminator_loss(model_d, cond, real_data, fake_data, 0)
             total_loss_d += loss_d.cpu().detach().numpy()
             
             # evaluate generator
@@ -138,9 +139,9 @@ def train(train_loader, test_loader, model_d, model_g, optimizer_d, optimizer_g,
     model_d, model_g = model_d.to(device), model_g.to(device)
     results = {'loss_d': [], 'loss_g': [], 'test_loss_d': [], 'test_loss_g': []}
     for epoch in range(args.epoch):
+        total_loss_d, total_loss_g = 0, 0
         for _, (X, y) in enumerate(train_loader):
             X, y = X.to(device), y.to(device)
-            total_loss_d, total_loss_g = 0, 0
             loss_d, loss_g = train_iter(X, y, model_d, model_g, optimizer_d, optimizer_g, args)
             total_loss_d += loss_d.cpu().detach().numpy()
             total_loss_g += loss_g.cpu().detach().numpy()
@@ -178,7 +179,8 @@ if __name__ == '__main__':
     test_datasets = Subset(stock_data, range(split_idx, len(stock_data)))
     train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
     test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
-    val_dates = random.sample(stock_data.time_intervals, args.num_val)
+    # val_dates = random.sample(stock_data.time_intervals, args.num_val)
+    val_dates = stock_data.time_intervals[-34:-32]
     noise_dim = args.noise_dim
     # model setting
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
