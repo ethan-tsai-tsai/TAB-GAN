@@ -27,7 +27,7 @@ class TemporalBlock(nn.Module):
         )
         self.downsample = nn.Conv1d(n_inputs, n_outputs, 1) if n_inputs != n_outputs else None
         self.relu = nn.ReLU()
-        self.init_weights()
+        # self.init_weights()
     
     def init_weights(self):
         self.conv1.weight.data.normal_(0, 0.01)
@@ -61,7 +61,7 @@ class TCN(nn.Module):
         super(TCN, self).__init__()
         self.tcn = TemporalConvNet(input_size, num_channels, kernel_size, dropout)
         self.linear = nn.Linear(num_channels[-1], output_size)
-        self.init_weights()
+        # self.init_weights()
     
     def init_weights(self):
         self.linear.weight.data.normal_(0, 0.01)
@@ -71,10 +71,10 @@ class TCN(nn.Module):
         return self.linear(y.transpose(1, 2))
 
 class generator(nn.Module):
-    def __init__(self, condition_size, noise_size, output_size, device):
+    def __init__(self, condition_size, noise_size, output_size, device, args):
         super(generator, self).__init__()
         self.device = device
-        self.hidden_layer_size = [128]
+        self.hidden_layer_size = [args.hidden_dim_g] * args.num_layers_g
         
         # 定義LSTM層的ModuleList
         self.lstm_list = nn.ModuleList(
@@ -104,12 +104,12 @@ class generator(nn.Module):
 class discriminator(nn.Module):
     def __init__(self, cond_dim, x_dim, device, args):
         super(discriminator, self).__init__()
-        num_channels = [8]*8
+        num_channels = [args.hidden_dim_d] * args.num_layers_d
         input_size = 1
         self.device = device
         self.tcn = TemporalConvNet(input_size, num_channels, 2, 0.1)
         self.linear = nn.Linear(num_channels[-1], 1)
-        self.init_weights()
+        # self.init_weights()
     
     def init_weights(self):
         self.linear.weight.data.normal_(0, 0.01)
@@ -118,7 +118,7 @@ class discriminator(nn.Module):
         cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
         input = torch.cat([cond, x], axis=1).unsqueeze(1)
         out = self.tcn(input)
-        weight = torch.exp(torch.linspace(0, -3, out.shape[2])).to(self.device)
+        weight = torch.exp(torch.linspace(1, -3, out.shape[2])).to(self.device)
         out = out * weight
         out = self.linear(out.transpose(1, 2))
         
