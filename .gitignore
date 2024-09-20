@@ -4,4 +4,4 @@ img/*
 model/*
 out/*
 logs/*
-.command.bat
+.command.sh

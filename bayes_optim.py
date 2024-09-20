@@ -18,9 +18,9 @@ def objective(trial):
     args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [4, 8, 16, 32, 64])
     args.num_layers_d = trial.suggest_categorical('num_layers_d', [4, 8, 16])
     # train
-    args.lr_g = trial.suggest_float('lr_g', 1e-5, 1e-2, log=True)
-    args.lr_d = trial.suggest_float('lr_d', 1e-5, 1e-2, log=True)
-    args.epoch = trial.suggest_int('epoch', 10, 1000)
+    args.lr_g = trial.suggest_float('lr_g', 1e-7, 1e-5, log=True)
+    args.lr_d = trial.suggest_float('lr_d', 1e-7, 1e-5, log=True)
+    args.epoch = trial.suggest_int('epoch', 100, 1000)
     args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512, 1024])
     args.d_iter = trial.suggest_int('d_iter', 1, 5)
     

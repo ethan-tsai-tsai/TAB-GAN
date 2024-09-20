@@ -180,6 +180,13 @@ if __name__ == '__main__':
         val_dates = random.sample(stock_data.time_intervals, args.num_val)
         
         wgan_model = wgan(stock_data, args)
+        print('----------------------------------------------------------------')
+        print('Start training...')
+        print('----------------------------------------------------------------')
+        print('hyperparameters: ')
+        for k, v in vars(args).items():
+                print("{}:\t{}".format(k, v))
+        print('----------------------------------------------------------------')
         results = wgan_model.train(train_loader, test_loader, val_dates)
         save_loss_curve(results, args)
         save_model(wgan_model.model_d, wgan_model.model_g, args)

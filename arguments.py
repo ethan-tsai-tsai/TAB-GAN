@@ -19,8 +19,8 @@ def parse_args():
     parser.add_argument('--num_layers_d', type=int, default=4, help='discriminator hidden layer number')
     
     # Train
-    parser.add_argument('--lr_g', type=float, default=0.0005, help='generator learning rate')
-    parser.add_argument('--lr_d', type=float, default=0.0001, help='discriminator learning rate')
+    parser.add_argument('--lr_g', type=float, default=0.00005, help='generator learning rate')
+    parser.add_argument('--lr_d', type=float, default=0.00001, help='discriminator learning rate')
     parser.add_argument('--cuda', type=int, default=7, help='cuda number')
     parser.add_argument('--epoch', type=int, default=50, help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=256, help='batch size')
