@@ -1,7 +1,7 @@
 import os
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, random_split
 from datetime import datetime
 # Import file
 from preprocessing import *
@@ -11,7 +11,7 @@ from arguments import *
 from eval import *
 
 class wgan:
-    def __init__(self, args):
+    def __init__(self,stock_data, args):
         self.args = args
         self.device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
         self.model_d = discriminator(stock_data.num_features, 1, self.device, self.args).to(self.device)
@@ -19,13 +19,14 @@ class wgan:
         self.BEST_KLD = np.inf
 
         # initialize folder
-        self.FOLDER_NAME = f'{args.stock}_{args.name}'
-        if not os.path.exists(f'logs/{self.FOLDER_NAME}'):os.makedirs(f'logs/{self.FOLDER_NAME}')
-        else: clear_folder(f'logs/{self.FOLDER_NAME}')
-        if not os.path.exists(f'./logs/{self.FOLDER_NAME}/pred'): os.makedirs(f'./logs/{self.FOLDER_NAME}/pred')
-        if not os.path.exists(f'./logs/{self.FOLDER_NAME}/dist'): os.makedirs(f'./logs/{self.FOLDER_NAME}/dist')
-        clear_folder(f'./logs/{self.FOLDER_NAME}/pred')
-        clear_folder(f'./logs/{self.FOLDER_NAME}/dist')
+        if self.args.mode=='train':
+            self.FOLDER_NAME = f'{args.stock}_{args.name}'
+            if not os.path.exists(f'logs/{self.FOLDER_NAME}'):os.makedirs(f'logs/{self.FOLDER_NAME}')
+            else: clear_folder(f'logs/{self.FOLDER_NAME}')
+            if not os.path.exists(f'./logs/{self.FOLDER_NAME}/pred'): os.makedirs(f'./logs/{self.FOLDER_NAME}/pred')
+            if not os.path.exists(f'./logs/{self.FOLDER_NAME}/dist'): os.makedirs(f'./logs/{self.FOLDER_NAME}/dist')
+            clear_folder(f'./logs/{self.FOLDER_NAME}/pred')
+            clear_folder(f'./logs/{self.FOLDER_NAME}/dist')
         
     def generator_loss(self, cond, fake_data):
         return -torch.mean(self.model_d(cond, fake_data))
@@ -61,12 +62,12 @@ class wgan:
     
     def train(self, train_loader, test_loader, val_dates=None):
         # trainin set
-        optimizer_d = torch.optim.Adam(self.model_d.parameters(), lr=args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
-        optimizer_g = torch.optim.Adam(self.model_g.parameters(), lr=args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
+        optimizer_d = torch.optim.Adam(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
+        optimizer_g = torch.optim.Adam(self.model_g.parameters(), lr=self.args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
         loss_fn = nn.L1Loss()
         results = {'loss_d': [], 'loss_g': [], 'test_loss_d': [], 'test_loss_g': [], 'test_kld': []}
         
-        for epoch in range(args.epoch):
+        for epoch in range(self.args.epoch):
             self.model_g.train()
             self.model_d.train()
             total_loss_d, total_loss_g = 0, 0
@@ -169,15 +170,16 @@ class wgan:
     
 if __name__ == '__main__':
     args = parse_args()
-    
-    stock_data = StockDataset(args)
-    split_idx = int(round(len(stock_data)*0.9))
-    train_datasets = Subset(stock_data, range(split_idx))
-    test_datasets = Subset(stock_data, range(split_idx, len(stock_data)))
-    train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
-    test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
-    # val_dates = random.sample(stock_data.time_intervals, args.num_val)
-    val_dates = stock_data.time_intervals[-34:-33]
-    
-    wgan = wgan(args)
-    wgan.train(train_loader, test_loader, val_dates)
+    if args.mode=='train':
+        stock_data = StockDataset(args)
+        train_size = int(0.9 * len(stock_data))
+        test_size = len(stock_data) - train_size
+        train_datasets, test_datasets = random_split(stock_data, [train_size, test_size])
+        train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
+        test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
+        val_dates = random.sample(stock_data.time_intervals, args.num_val)
+        
+        wgan_model = wgan(stock_data, args)
+        results = wgan_model.train(train_loader, test_loader, val_dates)
+        save_loss_curve(results, args)
+        save_model(wgan_model.model_d, wgan_model.model_g, args)

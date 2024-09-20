@@ -16,7 +16,8 @@ class StockDataset(Dataset):
         time_step: 取出資料的時間間隔
         """
         # Caculate running time
-        print('Processing data ......')
+        if mode=='train':
+            print('Processing data ......')
         start_time = datetime.now()
         
         # Load data
@@ -74,9 +75,10 @@ class StockDataset(Dataset):
         self.data = self.data[columns]
 
         
-        if mode == 'train': self.rolling_window() # 移動窗格
+        if mode=='train' or mode=='optim': self.rolling_window() # 移動窗格
         end_time = datetime.now()
-        print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
+        if mode=='train':
+            print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
         
     def standardize(self):
         self.scaler_X = MinMaxScaler(feature_range=[-1, 1])
@@ -113,7 +115,7 @@ class StockDataset(Dataset):
         self.data = self.data.drop(['MA_Open', 'MA_High', 'MA_Low', 'MA_Close', 'MA_Volume', 'MA_Amount'], axis=1)
         # 遞迴
         if self.data.isnull().values.any():
-            print(f'Data still has {self.data.isnull().sum().sum()} missing value, try again complete data.')
+            # print(f'Data still has {self.data.isnull().sum().sum()} missing value, try again complete data.')
             self.complete_data()
         
     def rolling_window(self):

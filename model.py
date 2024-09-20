@@ -27,7 +27,7 @@ class TemporalBlock(nn.Module):
         )
         self.downsample = nn.Conv1d(n_inputs, n_outputs, 1) if n_inputs != n_outputs else None
         self.relu = nn.ReLU()
-        # self.init_weights()
+        self.init_weights()
     
     def init_weights(self):
         self.conv1.weight.data.normal_(0, 0.01)
@@ -61,7 +61,7 @@ class TCN(nn.Module):
         super(TCN, self).__init__()
         self.tcn = TemporalConvNet(input_size, num_channels, kernel_size, dropout)
         self.linear = nn.Linear(num_channels[-1], output_size)
-        # self.init_weights()
+        self.init_weights()
     
     def init_weights(self):
         self.linear.weight.data.normal_(0, 0.01)
@@ -109,17 +109,17 @@ class discriminator(nn.Module):
         self.device = device
         self.tcn = TemporalConvNet(input_size, num_channels, 2, 0.1)
         self.linear = nn.Linear(num_channels[-1], 1)
-        # self.init_weights()
+        self.init_weights()
     
     def init_weights(self):
         self.linear.weight.data.normal_(0, 0.01)
     
-    def forward(self, cond, x, channel_last=True):
+    def forward(self, cond, x):
         cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
         input = torch.cat([cond, x], axis=1).unsqueeze(1)
         out = self.tcn(input)
-        weight = torch.exp(torch.linspace(1, -3, out.shape[2])).to(self.device)
-        out = out * weight
+        # weight = torch.exp(torch.linspace(1, -3, out.shape[2])).to(self.device)
+        # out = out * weight
         out = self.linear(out.transpose(1, 2))
         
         return out
