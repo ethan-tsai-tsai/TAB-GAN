@@ -61,7 +61,7 @@ if __name__ == '__main__':
     clear_folder(f'./img/dist/{FILE_NAME}')
     eval_dates = random.sample(stock_data.time_intervals[args.num_days : -args.num_days], args.num_eval)
     for date in eval_dates:
-        eval_date, y_preds, y_trues = prepare_eval_data(model_g, stock_data, device, date, args)
+        eval_date, y_preds, y_trues = prepare_eval_data(model_g, stock_data, device, date, args, pred_times=100)
         save_predict_plot(args, f'./img/pred/{FILE_NAME}', f'pred_{eval_date[-1]}', eval_date, y_preds, y_trues)
         dist_eval_date, dist_y_preds, dist_y_trues = prepare_eval_data(model_g, stock_data, device, date, args, pred_times=100)
         save_dist_plot(args, f'./img/dist/{FILE_NAME}', f'dist_d{dist_eval_date[-1]}', dist_eval_date, dist_y_preds, dist_y_trues)

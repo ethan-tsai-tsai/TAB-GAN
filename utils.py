@@ -79,12 +79,12 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     # plot
     plt.figure(figsize=(20, 10))
     plt.grid(True)
-
-    for i in range(len(y_preds)):
-        plt.plot(range(i*args.window_stride, i*args.window_stride+target_length), y_preds[i], color=choice(colors))
-        if y_true is not None:
-            plt.plot(range(i*args.window_stride, i*args.window_stride+len(y_true[i])), y_true[i], color='black', label='real')
-
+    for i in range(len(y_preds)//100):
+        x_vals = range(i*args.window_stride, i*args.window_stride + target_length)
+        for j in range(i*100, (i*100)+100):
+            plt.scatter(x_vals, y_preds[j], color=choice(colors))
+            if y_true is not None:
+                plt.plot(x_vals, y_true[j], color='black', label='real')
     # plt.legend()
     # plt.xticks(x_ticks, x_labels, rotation=15)
     plt.title(f'{dates[0]} - {dates[-1]}')

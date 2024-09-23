@@ -130,7 +130,7 @@ class wgan:
                         for date in val_dates:
                                 val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args)
                                 save_predict_plot(args, f'./logs/{self.FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
-                                dist_eval_date, dist_y_preds, dist_y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args, pred_times=10)
+                                dist_eval_date, dist_y_preds, dist_y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args, pred_times=100)
                                 save_dist_plot(args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[-1]}_epoch{epoch+1}', dist_eval_date, dist_y_preds, dist_y_trues)
         return results
     def test(self, test_loader):
