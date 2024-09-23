@@ -26,6 +26,7 @@ def parse_args():
     parser.add_argument('--epoch', type=int, default=50, help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=256, help='batch size')
     parser.add_argument('--d_iter', type=int, default=1, help='訓練幾次判別器後再訓練生成器')
+    parser.add_argument('--gp_lambda', type=float, default=10, help='lambda of gradient penalty')
     
     # Evaluation
     parser.add_argument('--num_days', type=int, default=10, help='單張折線圖中的天數')

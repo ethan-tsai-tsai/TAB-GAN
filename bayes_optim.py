@@ -20,9 +20,10 @@ def objective(trial):
     # train
     args.lr_g = trial.suggest_float('lr_g', 1e-7, 1e-4, log=True)
     args.lr_d = trial.suggest_float('lr_d', 1e-7, 1e-4, log=True)
-    args.epoch = trial.suggest_int('epoch', 10, 50)
+    args.epoch = trial.suggest_int('epoch', 100, 500)
     args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512, 1024])
     args.d_iter = trial.suggest_int('d_iter', 1, 5)
+    args.gp_lambda = trial.suggest_int('gp_lambda', 1, 10)
     
     # prepare dataset
     stock_data = StockDataset(args, mode='optim')

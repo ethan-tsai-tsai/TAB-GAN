@@ -32,7 +32,7 @@ class wgan:
         return -torch.mean(self.model_d(cond, fake_data))
     
     def discriminator_loss(self, cond, real_data, fake_data, gradient_penalty=0):
-        return -torch.mean(self.model_d(cond, real_data)) + torch.mean(self.model_d(cond, fake_data)) + gradient_penalty
+        return -torch.mean(self.model_d(cond, real_data)) + torch.mean(self.model_d(cond, fake_data)) + self.args.gp_lambda * gradient_penalty
     
     def compute_gradient_penalty(self, cond, real_data, fake_data):
         batch_size = real_data.size()[0]
@@ -58,7 +58,7 @@ class wgan:
 
         gradients = gradients.view(batch_size, -1)
         gradients_norm = torch.sqrt(torch.sum(gradients ** 2, dim=1) + 1e-12)
-        return 10 * ((gradients_norm - 1) ** 2).mean()
+        return ((gradients_norm - 1) ** 2).mean()
     
     def train(self, train_loader, test_loader, val_dates=None):
         # trainin set
@@ -122,7 +122,7 @@ class wgan:
             results['test_loss_g'].append(test_loss_g)
             results['test_kld'].append(kld)
             
-            if (epoch+1)%(self.args.epoch//10)==0:
+            if (epoch+1)%(self.args.epoch//5)==0:
                 print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
                 if self.args.mode=='train':
                 # save plot and histogram at each epoch (need to set stock evaluation dates)
