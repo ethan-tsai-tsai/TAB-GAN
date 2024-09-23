@@ -31,6 +31,7 @@ def parse_args():
     # Evaluation
     parser.add_argument('--num_days', type=int, default=10, help='單張折線圖中的天數')
     parser.add_argument('--num_eval', type=int , default=10, help='要評估的折線圖數量')
+    parser.add_argument('--pred_times', type=int, default=10, help='重複預測的次數')
     
     args = parser.parse_args()
     

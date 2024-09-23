@@ -6,6 +6,16 @@ import numpy as np
 from datetime import datetime, timedelta
 from random import choice
 
+def price_change(data):
+    changes = [0]  # 第一天沒有變化，設為 0
+    for i in range(1, len(data)):
+        if data[i - 1] == 0:  # 檢查前一天的價格是否為零
+            changes.append(0)  # 如果為零，無法計算變化，設為 0 或其他值
+        else:
+            change = (data[i] - data[i - 1]) / data[i - 1] * 100
+            changes.append(change)
+    return changes
+
 def calc_kld(generated_data, ground_truth, bins, range_min, range_max):
     pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True, range=(range_min, range_max))
     pd_gen, _ = np.histogram(generated_data, bins=bins, density=True, range=(range_min, range_max))
@@ -79,9 +89,9 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     # plot
     plt.figure(figsize=(20, 10))
     plt.grid(True)
-    for i in range(len(y_preds)//100):
+    for i in range(len(y_preds)//args.pred_times):
         x_vals = range(i*args.window_stride, i*args.window_stride + target_length)
-        for j in range(i*100, (i*100)+100):
+        for j in range(i*args.pred_times, (i*args.pred_times)+args.pred_times):
             plt.scatter(x_vals, y_preds[j], color=choice(colors))
             if y_true is not None:
                 plt.plot(x_vals, y_true[j], color='black', label='real')

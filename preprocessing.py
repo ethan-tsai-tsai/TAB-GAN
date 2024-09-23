@@ -41,13 +41,6 @@ class StockDataset(Dataset):
         
         # 加入欄位
         self.data = self.data.iloc[::self.time_step, :] # 每 time_step 分鐘取一筆資料
-        # self.data['7ma'] = EMA(self.data['Close'], 7)
-        # self.data['14ma'] = EMA(self.data['Close'], 14)
-        # self.data['21ma'] = EMA(self.data['Close'], 21)
-        # self.data['7upper'], self.data['7lower'] = bollinger_band(self.data['Close'], 7)
-        # self.data['14upper'], self.data['14lower'] = bollinger_band(self.data['Close'], 14)
-        # self.data['21upper'], self.data['21lower'] = bollinger_band(self.data['Close'], 21)
-        # self.data = self.data.iloc[(270 // args.time_step)::, :]
         
         self.data['y'] = self.data['Close']
         self.standardize() # 正規化
@@ -59,13 +52,14 @@ class StockDataset(Dataset):
         # self.data['minute'] = self.data.index.to_series().dt.minute
         
         # Price change
-        # self.data['change'] = price_change(self.data['Close'])
+        self.data['change'] = price_change(self.data['Close'])
         
         # 取得資訊
         self.num_features = len(self.data.drop('y', axis=1).columns) # 特徵數量
         
         # 防呆
         if self.data.isnull().values.any():
+            print(self.data)
             print('There are missing values in the data.')
 
         if np.isinf(self.data.values).any():
