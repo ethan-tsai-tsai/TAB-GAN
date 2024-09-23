@@ -83,6 +83,7 @@ class wgan:
                     loss_d = self.discriminator_loss(X, real_data, fake_data, gradient_penalty)
                     optimizer_d.zero_grad()
                     loss_d.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
                     optimizer_d.step()
                 
                 # train generator (minimize wgan loss)
@@ -91,6 +92,7 @@ class wgan:
                 loss_g = self.generator_loss(X, fake_data)
                 optimizer_g.zero_grad()
                 loss_g.backward()
+                torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
                 optimizer_g.step()
                 
                 # train discriminator part 2
@@ -128,10 +130,9 @@ class wgan:
                 # save plot and histogram at each epoch (need to set stock evaluation dates)
                     if val_dates is not None:
                         for date in val_dates:
-                                val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args)
-                                save_predict_plot(args, f'./logs/{self.FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
-                                dist_eval_date, dist_y_preds, dist_y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args, pred_times=100)
-                                save_dist_plot(args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[-1]}_epoch{epoch+1}', dist_eval_date, dist_y_preds, dist_y_trues)
+                                val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args, pred_times=10)
+                                save_predict_plot(self.args, f'./logs/{self.FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
+                                save_dist_plot(self.args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
         return results
     def test(self, test_loader):
         with torch.inference_mode():
