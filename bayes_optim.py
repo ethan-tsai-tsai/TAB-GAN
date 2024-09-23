@@ -9,7 +9,7 @@ def objective(trial):
     
     # set hyperparameters
     args = parse_args()
-    args.mode = 'optim' # 切換到 optim 模式
+    args.mode = 'optim' # optim mode
     # data
     args.noise_dim = trial.suggest_categorical('noise_dim', [8, 16, 32, 64])
     # model
@@ -18,9 +18,9 @@ def objective(trial):
     args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [4, 8, 16, 32, 64])
     args.num_layers_d = trial.suggest_categorical('num_layers_d', [4, 8, 16])
     # train
-    args.lr_g = trial.suggest_float('lr_g', 1e-7, 1e-5, log=True)
-    args.lr_d = trial.suggest_float('lr_d', 1e-7, 1e-5, log=True)
-    args.epoch = trial.suggest_int('epoch', 100, 1000)
+    args.lr_g = trial.suggest_float('lr_g', 1e-7, 1e-4, log=True)
+    args.lr_d = trial.suggest_float('lr_d', 1e-7, 1e-4, log=True)
+    args.epoch = trial.suggest_int('epoch', 100, 500)
     args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512, 1024])
     args.d_iter = trial.suggest_int('d_iter', 1, 5)
     
@@ -33,6 +33,7 @@ def objective(trial):
     test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
     val_dates = random.sample(stock_data.time_intervals, args.num_val)
     
+    print(f'Starting trial with params: {trial.params}')
     # model setup
     wgan_model = wgan(stock_data, args)
     _ = wgan_model.train(train_loader, test_loader)
@@ -42,7 +43,7 @@ def objective(trial):
     
 
 if __name__ == '__main__':
-    study = optuna.create_study(direction='maximize')
+    study = optuna.create_study(direction='minimize')
     study.optimize(objective, n_trials=100)
     print('Best trial:')
     trial = study.best_trial

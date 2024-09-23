@@ -122,16 +122,16 @@ class wgan:
             results['test_loss_g'].append(test_loss_g)
             results['test_kld'].append(kld)
             
-            if self.args.mode=='train':
-                if (epoch+1)%(args.epoch//10)==0:
-                    print(f'Epoch: {epoch+1}/{args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
-                    # save plot and histogram at each epoch (need to set stock evaluation dates)
+            if (epoch+1)%(self.args.epoch//10)==0:
+                print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
+                if self.args.mode=='train':
+                # save plot and histogram at each epoch (need to set stock evaluation dates)
                     if val_dates is not None:
                         for date in val_dates:
-                            val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args)
-                            save_predict_plot(args, f'./logs/{self.FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
-                            dist_eval_date, dist_y_preds, dist_y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args, pred_times=10)
-                            save_dist_plot(args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[-1]}_epoch{epoch+1}', dist_eval_date, dist_y_preds, dist_y_trues)
+                                val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args)
+                                save_predict_plot(args, f'./logs/{self.FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
+                                dist_eval_date, dist_y_preds, dist_y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args, pred_times=10)
+                                save_dist_plot(args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[-1]}_epoch{epoch+1}', dist_eval_date, dist_y_preds, dist_y_trues)
         return results
     def test(self, test_loader):
         with torch.inference_mode():
@@ -180,13 +180,14 @@ if __name__ == '__main__':
         val_dates = random.sample(stock_data.time_intervals, args.num_val)
         
         wgan_model = wgan(stock_data, args)
-        print('----------------------------------------------------------------')
-        print('Start training...')
-        print('----------------------------------------------------------------')
-        print('hyperparameters: ')
-        for k, v in vars(args).items():
-                print("{}:\t{}".format(k, v))
-        print('----------------------------------------------------------------')
+    print('----------------------------------------------------------------')
+    print('Start training...')
+    print('----------------------------------------------------------------')
+    print('hyperparameters: ')
+    for k, v in vars(args).items():
+            print("{}:\t{}".format(k, v))
+    print('----------------------------------------------------------------')
+    if args.mode=='train':
         results = wgan_model.train(train_loader, test_loader, val_dates)
         save_loss_curve(results, args)
         save_model(wgan_model.model_d, wgan_model.model_g, args)
