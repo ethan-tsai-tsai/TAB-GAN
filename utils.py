@@ -1,9 +1,10 @@
 import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import math
 import os
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from random import choice
 
 def price_change(data):
@@ -107,15 +108,30 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
 def save_dist_plot(args, path, file_name, dates, y_preds, y_true):
     y_true = np.array(y_true).flatten()
     y_preds = np.array(y_preds).flatten()
-    
-    plt.figure(figsize=(10, 10))
-    plt.hist(y_preds, bins='auto', density=True, alpha=0.5, color='green')
-    plt.hist(y_true, bins='auto', density=True, alpha=0.5, color='red')
-    plt.title(f'{dates[0]} - {dates[-1]}')
-    plt.xlabel('stock price (x)')
-    plt.ylabel('p(x)')
-    plt.savefig(f'{path}/{file_name}.png')
-    plt.close()
+    if args.num_days == 1: # 如果執行一次程式只預測一天的股價，則針對每筆資料畫分配圖
+        target_length = args.target_length//args.time_step
+        n_plot = math.ceil(math.sqrt(target_length)) # 圖片一欄/列要幾張
+        start_time = datetime.combine(datetime.today(), time(9,0))
+        _, axes = plt.subplots(n_plot, n_plot, figsize=(10,10))
+        idx=0
+        for row in range(n_plot):
+            for col in range(n_plot):
+                axes[row, col].hist(y_preds[idx::target_length], bins='auto', density=True, alpha=0.5, color='green')
+                axes[row, col].hist(y_true[idx], bins='auto', density=True, alpha=0.5, color='red')
+                axes[row, col].set_title(f'{(start_time + timedelta(minutes=args.time_step*(idx+1))).strftime("%H:%M")}')
+                idx += 1
+        plt.tight_layout()
+        plt.savefig(f'{path}/{dates[0]}.png')
+        plt.close()
+    else:
+        plt.figure(figsize=(10, 10))
+        plt.hist(y_preds, bins='auto', density=True, alpha=0.5, color='green')
+        plt.hist(y_true, bins='auto', density=True, alpha=0.5, color='red')
+        plt.title(f'{dates[0]} - {dates[-1]}')
+        plt.xlabel('stock price (x)')
+        plt.ylabel('p(x)')
+        plt.savefig(f'{path}/{file_name}.png')
+        plt.close()
 
 def clear_folder(folder_path):
     # 確保資料夾存在
