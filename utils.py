@@ -92,8 +92,17 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     plt.grid(True)
     for i in range(len(y_preds)//args.pred_times):
         x_vals = range(i*args.window_stride, i*args.window_stride + target_length)
-        for j in range(i*args.pred_times, (i*args.pred_times)+args.pred_times):
-            plt.scatter(x_vals, y_preds[j], color=choice(colors))
+        color = choice(colors)
+        # get upper and lower bound
+        upper_bound = []
+        lower_bound = []
+        for j in zip(*y_preds[args.pred_times * i: args.pred_times * (i + 1)]):
+            upper_bound.append(np.percentile(j, args.bound_percent))
+            lower_bound.append(np.percentile(j, 100 - args.bound_percent))
+        
+        plt.fill_between(x_vals, lower_bound, upper_bound, color=color, alpha=0.5)
+        for j in range(i*args.pred_times, args.pred_times * (i+1)):
+            plt.scatter(x_vals, y_preds[j], color=color, alpha=0.3)
             if y_true is not None:
                 plt.plot(x_vals, y_true[j], color='black', label='real')
     # plt.legend()
@@ -102,7 +111,6 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     plt.xlabel('Time')
     plt.ylabel('Stock Price')
     plt.savefig(f'{path}/{file_name}.png')
-    # print(f'Svaving prediction: {dates[-1]}')
     plt.close()
 
 def save_dist_plot(args, path, file_name, dates, y_preds, y_true):

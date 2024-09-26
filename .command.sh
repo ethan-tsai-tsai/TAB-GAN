@@ -33,7 +33,10 @@ python eval.py\
     --epoch 325\
     --batch_size 1024\
     --d_iter 3\
-    --gp_lambda 9&
+    --gp_lambda 9\
+    --num_days 2\
+    --pred_times 100\
+    --bound_percent 90&
 python eval.py --stock 1101 --cuda 1 &
 python eval.py --stock 2330 --cuda 2 &
 python eval.py --stock 2610 --cuda 3 &

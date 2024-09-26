@@ -46,11 +46,11 @@ class StockDataset(Dataset):
         self.standardize() # 正規化
         
         # Date Columns
-        self.data['month'] = self.data.index.to_series().dt.month
-        self.data['day'] = self.data.index.to_series().dt.day
-        self.data['hour'] = self.data.index.to_series().dt.hour
-        self.data['minute'] = self.data.index.to_series().dt.minute
-        self.data['week'] = self.data.index.to_series().dt.weekday
+        # self.data['month'] = self.data.index.to_series().dt.month
+        # self.data['day'] = self.data.index.to_series().dt.day
+        # self.data['hour'] = self.data.index.to_series().dt.hour
+        # self.data['minute'] = self.data.index.to_series().dt.minute
+        # self.data['week'] = self.data.index.to_series().dt.weekday
         
         # Price change
         self.data['change'] = price_change(self.data['Close'])
