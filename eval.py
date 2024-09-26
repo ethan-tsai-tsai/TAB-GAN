@@ -64,4 +64,4 @@ if __name__ == '__main__':
     for date in eval_dates:
         eval_date, y_preds, y_trues = prepare_eval_data(model_g, stock_data, device, date, args, pred_times=args.pred_times)
         save_predict_plot(args, f'./img/pred/{FILE_NAME}', f'pred_{eval_date[-1]}', eval_date, y_preds, y_trues)
-        save_dist_plot(args, f'./img/dist/{FILE_NAME}', f'dist_d{eval_date[-1]}', eval_date, y_preds, y_trues)
+        save_dist_plot(args, f'./img/dist/{FILE_NAME}', f'dist_{eval_date[0]}_to_{eval_date[-1]}', eval_date, y_preds, y_trues)

@@ -132,7 +132,7 @@ class wgan:
                         for date in val_dates:
                                 val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args, pred_times=10)
                                 save_predict_plot(self.args, f'./logs/{self.FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
-                                save_dist_plot(self.args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
+                                save_dist_plot(self.args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[0]}_to_{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
         return results
     def test(self, test_loader):
         with torch.inference_mode():
