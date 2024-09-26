@@ -1,31 +1,25 @@
 import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import math
 import os
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
+from random import choice
 
-def SMA(data, windows):
-    res = data.rolling(window = windows).mean()
-    return res
+def calc_kld(generated_data, ground_truth, bins, range_min, range_max):
+    pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True, range=(range_min, range_max))
+    pd_gen, _ = np.histogram(generated_data, bins=bins, density=True, range=(range_min, range_max))
+    kld = 0
+    for x1, x2 in zip(pd_gt, pd_gen):
+        if x1 != 0 and x2 == 0:
+            kld += x1
+        elif x1 == 0 and x2 != 0:
+            kld += x2
+        elif x1 != 0 and x2 != 0:
+            kld += x1 * np.log(x1 / x2)
 
-def EMA(data, windows):
-    res = data.ewm(span = windows).mean()
-    return res
-
-def bollinger_band(data, windows):
-    sma = data.rolling(window = windows).mean()
-    std = data.rolling(window = windows).std()
-    upper = sma + 2 * std
-    lower = sma - 2 * std
-    return upper, lower
-
-def price_change(data):
-    changes = [0]
-    for i in range(1, len(data)):
-        change = (data[i] - data[i - 1]) / data[i - 1] * 100
-        changes.append(change)
-    return changes
+    return np.abs(kld)
 
 def save_loss_curve(results, args):
     print('Saving loss curve')
@@ -81,23 +75,50 @@ def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     # 設定x座標
     x_labels = pre_time_array * (args.num_days-1) + time_array
     x_ticks = [i * x_ticks_interval/args.time_step + 1 for i in range(len(x_labels))]
-    colors = list(mpl.colors.cnames)
+    colors = list(mpl.colors.cnames) * 10
     
     # plot
     plt.figure(figsize=(20, 10))
     plt.grid(True)
-    for i in range(len(y_preds)):
-        plt.plot(range(i*args.window_stride, i*args.window_stride+target_length), y_preds[i], color=colors[6+i])
-    if y_true is not None:
-        plt.plot(range(len(y_true)), y_true, color='black', label='real')
-
-    plt.legend()
-    plt.xticks(x_ticks, x_labels, rotation=15)
+    for i in range(len(y_preds)//args.pred_times):
+        x_vals = range(i*args.window_stride, i*args.window_stride + target_length)
+        color = choice(colors)
+        # get upper and lower bound
+        upper_bound = []
+        lower_bound = []
+        for j in zip(*y_preds[args.pred_times * i: args.pred_times * (i + 1)]):
+            upper_bound.append(np.percentile(j, args.bound_percent))
+            lower_bound.append(np.percentile(j, 100 - args.bound_percent))
+        
+        plt.fill_between(x_vals, lower_bound, upper_bound, color=color, alpha=0.5)
+        for j in range(i*args.pred_times, args.pred_times * (i+1)):
+            plt.scatter(x_vals, y_preds[j], color=color, alpha=0.3)
+            if y_true is not None:
+                plt.plot(x_vals, y_true[j], color='black', label='real')
+    # plt.legend()
+    # plt.xticks(x_ticks, x_labels, rotation=15)
     plt.title(f'{dates[0]} - {dates[-1]}')
     plt.xlabel('Time')
     plt.ylabel('Stock Price')
-    plt.savefig(f'{path}/{args.stock}_{args.name}/{file_name}.png')
-    # print(f'Svaving prediction: {dates[-1]}')
+    plt.savefig(f'{path}/{file_name}.png')
+    plt.close()
+
+def save_dist_plot(args, path, file_name, dates, y_preds, y_true):
+    y_true = np.array(y_true).flatten()
+    y_preds = np.array(y_preds).flatten()
+    target_length = args.target_length//args.time_step
+    n_plot = math.ceil(math.sqrt(target_length)) # 圖片一欄/列要幾張
+    start_time = datetime.combine(datetime.today(), time(9,0))
+    _, axes = plt.subplots(n_plot, n_plot, figsize=(10,10))
+    idx=0
+    for row in range(n_plot):
+        for col in range(n_plot):
+            axes[row, col].hist(y_preds[idx::target_length], bins='auto', density=True, alpha=0.5, color='green')
+            axes[row, col].hist(y_true[idx::target_length], bins='auto', density=True, alpha=0.5, color='red')
+            axes[row, col].set_title(f'{(start_time + timedelta(minutes=args.time_step*(idx+1))).strftime("%H:%M")}')
+            idx += 1
+    plt.tight_layout()
+    plt.savefig(f'{path}/{file_name}.png')
     plt.close()
 
 def clear_folder(folder_path):
