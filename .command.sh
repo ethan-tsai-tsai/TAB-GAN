@@ -39,7 +39,7 @@ python eval.py\
     --bound_percent 90&
 python eval.py --stock 1101 --cuda 1 &
 python eval.py --stock 2330 --cuda 2 &
-python eval.py --stock 2610 --cuda 4 &
+python eval.py --stock 2610 --cuda 3 &
 
 # bayes optimization
 nohup python -u bayes_optim.py --stock 0050 --cuda 6 > ./out/optim_0050.out 2>&1 &
