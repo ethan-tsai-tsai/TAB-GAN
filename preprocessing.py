@@ -9,12 +9,6 @@ from utils import *
 
 class StockDataset(Dataset):
     def __init__(self, args, mode='train'):
-        """
-        data: csv: 股價資料的csv檔
-        window_size: 取幾天的資料來預測下一天的資料
-        target_length: 預測的資料長度
-        time_step: 取出資料的時間間隔
-        """
         # Caculate running time
         if mode=='train':
             print('Processing data ......')
@@ -40,41 +34,86 @@ class StockDataset(Dataset):
         self.complete_data() 
         
         # 加入欄位
+        ## Technical Indicators
+        self.data['cmf'] = self.cmf()
+        self.data['colose_ratio'] = self.close_ratio(window=self.time_step)
+        self.data['volume_percentile'] = self.volume_percentile(window=self.time_step)
+        
+        ## 切割掉第一天（技術指標大多沒有值）
+        self.data = self.data.iloc[270::, :]
+        
+        # ※根據處理資料的方式，分為在切割資料前和後
         self.data = self.data.iloc[::self.time_step, :] # 每 time_step 分鐘取一筆資料
+        
+        self.data['change'] = self.price_change(self.data['Close'])
         
         self.data['y'] = self.data['Close']
         self.standardize() # 正規化
         
-        # Date Columns
-        # self.data['month'] = self.data.index.to_series().dt.month
-        # self.data['day'] = self.data.index.to_series().dt.day
-        # self.data['hour'] = self.data.index.to_series().dt.hour
-        # self.data['minute'] = self.data.index.to_series().dt.minute
-        # self.data['week'] = self.data.index.to_series().dt.weekday
-        
-        # Price change
-        self.data['change'] = price_change(self.data['Close'])
+        ## Date Columns
+        self.data['month'] = self.data.index.to_series().dt.month
+        self.data['day'] = self.data.index.to_series().dt.day
+        self.data['hour'] = self.data.index.to_series().dt.hour
+        self.data['minute'] = self.data.index.to_series().dt.minute
+        self.data['week'] = self.data.index.to_series().dt.weekday
         
         # 取得資訊
         self.num_features = len(self.data.drop('y', axis=1).columns) # 特徵數量
         
-        # 防呆
-        if self.data.isnull().values.any():
-            print(self.data)
-            print('There are missing values in the data.')
-
-        if np.isinf(self.data.values).any():
-            print('There are inf values in the data.')
         
         columns = [col for col in self.data.columns if col != 'y'] + ['y'] # 重新排列欄位順序
         self.data = self.data[columns]
+        
+        # 防呆
+        assert not self.data.isnull().values.any(), 'There are missing values in the data.'
+        assert not np.isinf(self.data.values).any(), 'There are inf values in the data.'
 
         
         if mode=='train' or mode=='optim': self.rolling_window() # 移動窗格
         end_time = datetime.now()
         if mode=='train':
             print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
+    
+    def money_flow_multiplier(self):
+        rolling_high = self.data['High'].rolling(window=self.time_step).max().fillna(0)
+        rolling_low = self.data['Low'].rolling(window=self.time_step).min().fillna(0)
+        money_flow_multiplier = ((self.data['Close'] - rolling_low) - (rolling_high - self.data['Close'])) / (rolling_high - rolling_low)
+        return money_flow_multiplier
         
+    def money_flow_volume(self):
+        money_flow_multiplier = self.money_flow_multiplier()
+        rolling_volume = self.data['Volume'].rolling(window=self.time_step).sum().fillna(0)
+        money_flow_volume = money_flow_multiplier * rolling_volume
+        return money_flow_volume
+        
+    def cmf(self):
+        money_flow_volume = self.money_flow_volume()
+        rolling_volume = self.data['Volume'].rolling(window=self.time_step).sum().fillna(0)
+        rolling_money_flow_volume = money_flow_volume.rolling(window=self.time_step).sum().fillna(0)
+        cmf = rolling_money_flow_volume / rolling_volume
+        return cmf
+    
+    def close_ratio(self, window):
+        money_flow_multiplier = self.money_flow_multiplier()
+        close_ratio = money_flow_multiplier.rolling(window=window).mean().fillna(0)
+        return close_ratio
+    
+    def volume_percentile(self, window):
+        rolling_volume = self.data['Volume'].rolling(window=window).mean().fillna(0)
+        percentile = np.percentile(rolling_volume, np.arange(101))
+        volume_percentile = pd.cut(rolling_volume, bins=percentile, labels=False, duplicates='drop').fillna(0)
+        return volume_percentile
+    
+    def price_change(self, data):
+        changes = [0]  # 第一天沒有變化，設為 0
+        for i in range(1, len(data)):
+            if data[i - 1] == 0:  # 檢查前一天的價格是否為零
+                changes.append(0)  # 如果為零，無法計算變化，設為 0 或其他值
+            else:
+                change = (data[i] - data[i - 1]) / data[i - 1] * 100
+                changes.append(change)
+        return changes   
+ 
     def standardize(self):
         self.scaler_X = MinMaxScaler(feature_range=[-1, 1])
         self.scaler_y = MinMaxScaler(feature_range=[-1, 1])

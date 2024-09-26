@@ -7,16 +7,6 @@ import numpy as np
 from datetime import datetime, timedelta, time
 from random import choice
 
-def price_change(data):
-    changes = [0]  # 第一天沒有變化，設為 0
-    for i in range(1, len(data)):
-        if data[i - 1] == 0:  # 檢查前一天的價格是否為零
-            changes.append(0)  # 如果為零，無法計算變化，設為 0 或其他值
-        else:
-            change = (data[i] - data[i - 1]) / data[i - 1] * 100
-            changes.append(change)
-    return changes
-
 def calc_kld(generated_data, ground_truth, bins, range_min, range_max):
     pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True, range=(range_min, range_max))
     pd_gen, _ = np.histogram(generated_data, bins=bins, density=True, range=(range_min, range_max))
