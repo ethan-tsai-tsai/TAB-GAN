@@ -8,35 +8,14 @@ from model import *
 from utils import *
 from arguments import *
 
-def predict(args, model_g, device, X, y=None):
+def predict(model_g, X, device, args):
+    # predict
     model_g.to(device)
     model_g.eval()
     with torch.inference_mode():
-        X = X.unsqueeze(0).to(device)
         noise = torch.randn(X.shape[0], args.noise_dim).to(device)
-        y_pred = model_g(X, noise).cpu().detach().tolist() # 輸出為三維
-        y_pred = np.array(y_pred).flatten()
-        if y is not None: y_true = y.cpu().detach().numpy()
-        else: y_true = None
-        return y_pred, y_true
-
-def prepare_eval_data(model_g, stock_data, device, date, args):
-    time_idx = stock_data.time_intervals.index(date)
-    eval_date = stock_data.time_intervals[time_idx:time_idx+args.num_days] # the dates of evaluation in one plot
-    X, y = stock_data.get_data(date, days=args.num_days) 
-    X, y = X.to(device), y.to(device)
-    y = y.unsqueeze(2)
-    y_preds = []
-    y_trues = []
-    for i in range(X.shape[0]):
-        for _ in range(args.pred_times):
-            y_pred, y_true = predict(args, model_g, device, X[i], y[i])
-            y_true = stock_data.scaler_y.inverse_transform(y_true)
-            y_pred = stock_data.scaler_y.inverse_transform([y_pred])[0]
-            y_preds.append(y_pred)
-            y_trues.append(y_true)
-        
-    return eval_date, y_preds, y_trues
+        y_preds = model_g(X, noise).squeeze().cpu().detach().numpy()
+    return y_preds
 
 if __name__ == '__main__':
     args = parse_args()
@@ -61,6 +40,18 @@ if __name__ == '__main__':
     clear_folder(f'./img/dist/{FILE_NAME}')
     eval_dates = random.sample(stock_data.time_intervals[args.num_days : -args.num_days], args.num_eval)
     for date in eval_dates:
-        eval_date, y_preds, y_trues = prepare_eval_data(model_g, stock_data, device, date, args)
-        save_predict_plot(args, f'./img/pred/{FILE_NAME}', f'pred_{eval_date[-1]}', eval_date, y_preds, y_trues)
-        save_dist_plot(args, f'./img/dist/{FILE_NAME}', f'dist_{eval_date[0]}_to_{eval_date[-1]}', eval_date, y_preds, y_trues)
+        # prepare eval data
+        time_idx = stock_data.time_intervals.index(date)
+        eval_date = stock_data.time_intervals[time_idx:time_idx+args.num_days] # the dates of evaluation in one plot
+        X, y = stock_data.get_data(date, days=args.num_days) 
+        X = X.to(device)
+        # predict
+        y_preds = predict(model_g, X, device, args)
+        # inverse transformation
+        y_preds = stock_data.scaler_y.inverse_transform(y_preds)
+        y_trues = stock_data.scaler_y.inverse_transform(y)
+        print(y_preds.shape)
+        y_preds_arrange = arrange_time(y_preds, args.target_length//args.time_step, args.window_stride)
+        print(len(y_preds_arrange))
+        # save_predict_plot(args, f'./img/pred/{FILE_NAME}', f'pred_{eval_date[-1]}', eval_date, y_preds, y_trues)
+        # save_dist_plot(args, f'./img/dist/{FILE_NAME}', f'dist_{eval_date[0]}_to_{eval_date[-1]}', eval_date, y_preds, y_trues)

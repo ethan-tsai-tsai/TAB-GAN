@@ -52,6 +52,25 @@ def save_model(model_d, model_g, args):
         'model_g': model_g.state_dict()
     }, f'./model/{args.stock}_{args.name}.pth')
 
+def clear_folder(folder_path):
+    # 確保資料夾存在
+    if not os.path.exists(folder_path):
+        print(f"資料夾 {folder_path} 不存在。")
+        return
+    
+    # 遍歷資料夾中的所有檔案
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        try:
+            # 如果是檔案，則刪除
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            # 如果是資料夾，則遞迴清空
+            elif os.path.isdir(file_path):
+                clear_folder(file_path)
+        except Exception as e:
+            print(f"刪除 {file_path} 時發生錯誤: {e}")
+            
 def save_predict_plot(args, path, file_name, dates, y_preds, y_true=None):
     # 設定變數
     seq_unit = 270//args.time_step
@@ -121,21 +140,36 @@ def save_dist_plot(args, path, file_name, dates, y_preds, y_true):
     plt.savefig(f'{path}/{file_name}.png')
     plt.close()
 
-def clear_folder(folder_path):
-    # 確保資料夾存在
-    if not os.path.exists(folder_path):
-        print(f"資料夾 {folder_path} 不存在。")
-        return
+def arrange_time(time_list, n, window_step):
+    """
+    n: number of time points
+    """
+    # [18, 9]
+    indicies = [0] * len(time_list)
+    output = []
+    for group_size in range(1, sum(len(row) for row in time_list)):
+        sublist = []
+        for i in range(min(group_size, len(time_list))):
+            if indicies[i] < len(time_list[i]):
+                sublist.append(time_list[i][indicies[i]])
+                indicies[i] += window_step
+        if len(sublist)!=0:
+            output.append(sublist)
+    return output
+
+class plot_predicions:
+    def __init__(self, path, args):
+        self.args = args
+        self.path = path
+        self.seq_len = 270 // self.args.time_step
+        self.target_len = self.args.target_length // self.args.time_step
+        
+        # check folder exists
+        if not os.path.exists(self.path): os.makedirs(path)
+        else: clear_folder(self.path)
     
-    # 遍歷資料夾中的所有檔案
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        try:
-            # 如果是檔案，則刪除
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-            # 如果是資料夾，則遞迴清空
-            elif os.path.isdir(file_path):
-                clear_folder(file_path)
-        except Exception as e:
-            print(f"刪除 {file_path} 時發生錯誤: {e}")
+    def single_time_plot(y_ture, y_pred):
+        """
+        plot single time prediction with scatter plot and histogram
+        """
+        pass
