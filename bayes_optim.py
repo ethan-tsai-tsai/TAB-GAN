@@ -16,9 +16,9 @@ def objective(trial):
         args.noise_dim = trial.suggest_categorical('noise_dim', [32, 64, 128])
         # model
         args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [32, 64, 128])
-        args.num_layers_g = trial.suggest_categorical('num_layers_g', [1, 2])
+        args.num_layers_g = trial.suggest_categorical('num_layers_g', [1, 2, 3])
         args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [8, 16, 32])
-        args.num_layers_d = trial.suggest_categorical('num_layers_d', [4, 8])
+        args.num_layers_d = trial.suggest_categorical('num_layers_d', [4, 8, 16])
         # train
         args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-4, log=True)
         args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-4, log=True)
@@ -57,3 +57,4 @@ if __name__ == '__main__':
     print('  Params: ')
     for key, value in trial.params.items():
         print('    {}: {}'.format(key, value))
+        print(f'--{key} {value}\\')

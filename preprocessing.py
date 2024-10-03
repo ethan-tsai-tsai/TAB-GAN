@@ -43,7 +43,7 @@ class StockDataset(Dataset):
         self.data = self.data.iloc[270::, :]
         
         # ※根據處理資料的方式，分為在切割資料前和後
-        self.data = self.data.iloc[::self.time_step, :] # 每 time_step 分鐘取一筆資料
+        self.data = self.data.iloc[29::self.time_step, :] # 每 time_step 分鐘取一筆資料
         
         self.data['change'] = self.price_change(self.data['Close'])
         
@@ -68,7 +68,7 @@ class StockDataset(Dataset):
         assert not self.data.isnull().values.any(), 'There are missing values in the data.'
         assert not np.isinf(self.data.values).any(), 'There are inf values in the data.'
 
-        
+        self.data.to_csv(f'./data/{args.stock}_done.csv')
         if mode=='train' or mode=='optim': self.rolling_window() # 移動窗格
         end_time = datetime.now()
         if mode=='train':
@@ -156,19 +156,19 @@ class StockDataset(Dataset):
         self.X, self.y = [], []
         for i in range(0, len(self.data) - self.seq_len - self.target_length, self.window_stride):
             self.X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)
-            self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 只取最後
+            self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values)
 
     def get_data(self, date, days):
         X, y= [], []
-        date = pd.to_datetime(date + ' 09:01:00')
+        n = self.seq_len//self.window_size # 一天的資料筆數
+        date = pd.to_datetime(date + ' 09:30:00')
         try:
             idx = self.data.index.get_loc(date)
-            for i in range(idx, 1+idx + (days-1)*self.seq_len//self.window_size, self.window_stride):
+            for i in range(idx - n, 1 + idx + days * n, self.window_stride):
                 X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)
-                y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 只取最後
-                # y.append(self.data.iloc[i:i+self.seq_len+self.target_length, len(self.data.columns)-1].values) # 取X天數+最後
+                y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values)
         except:
-            idx = len(self.data) - self.seq_len//self.window_size
+            idx = len(self.data) - n
             X.append(self.data.iloc[idx-self.seq_len:idx, :].values)
             y.append(self.data.iloc[idx: idx+self.target_length, 3].values)
         X = np.array(X)
