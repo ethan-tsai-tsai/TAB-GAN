@@ -1,6 +1,7 @@
 import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import seaborn as sns
 import math
 import os
 import numpy as np
@@ -68,6 +69,7 @@ def clear_folder(folder_path):
             # 如果是資料夾，則遞迴清空
             elif os.path.isdir(file_path):
                 clear_folder(file_path)
+                os.rmdir(file_path)
         except Exception as e:
             print(f"刪除 {file_path} 時發生錯誤: {e}")
             
@@ -163,13 +165,130 @@ class plot_predicions:
         self.path = path
         self.seq_len = 270 // self.args.time_step
         self.target_len = self.args.target_length // self.args.time_step
-        
+        self.time_array = self._get_time_interval()
         # check folder exists
         if not os.path.exists(self.path): os.makedirs(path)
         else: clear_folder(self.path)
     
-    def single_time_plot(y_ture, y_pred):
+    def dist_plot(self, y_true, y_pred, date):
+        file_name = f'{date}'
+        _, axes = plt.subplots(3, 3, figsize=(12, 12))
+        for i, ax in enumerate(axes.flat):
+            sns.histplot(y_pred[i], ax=ax, stat='density', color='green', alpha=0.3)
+            if self.args.num_days == 1:
+                ax.axvline(x=y_true[i][0], color='black', linestyle='--', linewidth=5)
+            else:
+                sns.histplot(y_true[i], ax=ax, stat='density', color='red', alpha=0.3)
+            ax.set_title(f'{self.time_array[i]}')
+        plt.tight_layout()
+        plt.savefig(f'{self.path}/{file_name}_dist.png')
+        plt.close()
+    
+    def band_plot(self, y_true, y_pred, date):
+        file_name = f'{date}'
+        
+        lengths = [self.target_len * self.args.pred_times] * (self.seq_len * self.args.num_days)
+        upper_bound, lower_bound = self._get_bound(y_pred, lengths)
+        x_val = np.arange(self.seq_len * self.args.num_days)
+        plt.figure(figsize=(10, 5))
+        sns.lineplot(x=x_val, y=y_true, color='black')
+        sns.scatterplot(x=x_val.repeat(self.seq_len * self.args.pred_times), y=y_pred, hue=x_val.repeat(self.seq_len * self.args.pred_times), palette='pastel', alpha=0.5)
+        plt.fill_between(x_val, lower_bound, upper_bound, color='blue', alpha=0.3)
+        plt.xlabel('Time')
+        plt.ylabel('Price')
+        if self.args.num_days < 3: plt.xticks(ticks=x_val, labels=self.time_array * self.args.num_days)
+        plt.legend().remove()
+        plt.savefig(f'{self.path}/{file_name}.png')
+        plt.close()
+    
+    def single_time_plot(self, y_true, y_pred, date):
         """
         plot single time prediction with scatter plot and histogram
         """
-        pass
+        if not os.path.exists(f'{self.path}/{date}'): os.mkdir(f'{self.path}/{date}')
+        
+        # create axes
+        fig = plt.figure(figsize=(10, 5))
+        gs = mpl.gridspec.GridSpec(1, 2, width_ratios=[3, 1])
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1])
+        
+        # plot unchanged parts
+        x_val = np.arange(self.seq_len)
+        sns.lineplot(x=x_val, y=y_true, color='black', ax=ax1)
+        ax1.set_xlabel('Time')
+        ax1.set_ylabel('Price')
+        ax1.set_xticks(x_val)
+        ax1.set_xticklabels(self.time_array)
+        ax2.set_xlabel('Price')
+        ax2.set_ylabel('P(Price)')
+        
+        upper_bound_list = []
+        lower_bound_list = []
+        
+        # plot every time unit
+        for i in range(self.target_len - 1):
+            current_pred = np.array([])
+            for ind, sublist in enumerate(y_pred[i:]):
+                if ind < len(sublist):
+                    if ind == 0: current_pred = np.concatenate((current_pred, sublist))
+                    else: current_pred = np.concatenate((current_pred, sublist[:-ind * self.args.pred_times]))
+            
+            lengths = [x for x in range(self.target_len * self.args.pred_times, i * self.args.pred_times, -self.args.pred_times)]
+            
+            upper_bound, lower_bound = self._get_bound(current_pred, lengths)
+            current_x_val = np.repeat(np.arange(i, self.target_len), np.arange(self.target_len * self.args.pred_times, i * self.args.pred_times, -self.args.pred_times))
+            
+            # band plot
+            ax1.collections.clear()
+            sns.scatterplot(x=current_x_val, y=current_pred, color='blue', ax=ax1, alpha=0.5)
+            ax1.fill_between(x_val[i::], lower_bound, upper_bound, color='blue', alpha=0.5)  # Current area
+            
+            # Plot the previous bound area
+            if upper_bound_list and lower_bound_list:
+                for ind in range(len(upper_bound_list)):
+                    ax1.fill_between(x_val[ind::], lower_bound_list[ind], upper_bound_list[ind], color='lightblue', alpha=0.15)
+                    
+            # Update the bound list for the next iteration
+            upper_bound_list.append(upper_bound)
+            lower_bound_list.append(lower_bound)
+            
+            # histogram
+            ax2.cla()
+            sns.histplot(x=current_pred[:self.seq_len*self.args.pred_times], stat='density', color='blue', alpha=0.3, ax=ax2)
+            ax2.axvline(x=y_true[i], color='black', linestyle='--', linewidth=5)
+            
+            # save fig
+            ax1.set_title(f'{date} - {self.time_array[i]}')
+            plt.savefig(f'{self.path}/{date}/{self.time_array[i]}.png')
+        plt.close()
+        
+    def _get_time_interval(self):
+        # 取得時間陣列
+        start_time = datetime.strptime('09:00', '%H:%M')
+        end_time = datetime.strptime('13:30', '%H:%M')
+        x_ticks_interval = self.args.time_step
+
+        time_array = []
+        time_array = []
+        current_time = start_time
+        while current_time < end_time:
+            current_time += timedelta(minutes=x_ticks_interval)
+            time_array.append(current_time.strftime('%H:%M'))
+        return time_array
+        
+    def _get_bound(self, y_preds, lengths):
+        result = []
+        start = 0
+        for length in lengths:
+            result.append(y_preds[start: start + length])
+            start += length
+        
+        result = [np.array(i) for i in result]
+        
+        upper_bound = []
+        lower_bound = []
+        for i in result:
+            upper_bound.append(np.percentile(i, self.args.bound_percent))
+            lower_bound.append(np.percentile(i, 100 - self.args.bound_percent))
+        return np.array(upper_bound), np.array(lower_bound)

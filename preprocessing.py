@@ -164,7 +164,7 @@ class StockDataset(Dataset):
         date = pd.to_datetime(date + ' 09:30:00')
         try:
             idx = self.data.index.get_loc(date)
-            for i in range(idx - n, idx + (days) * n, self.window_stride):
+            for i in range(idx - n, idx + (days) * n + 1, self.window_stride):
                 X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)
                 y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values)
         except:
