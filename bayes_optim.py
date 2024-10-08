@@ -6,26 +6,25 @@ from arguments import *
 from preprocessing import *
 from train import *
 
-logging.basicConfig(level=logging.DEBUG)
+optuna.logging.set_verbosity(optuna.logging.DEBUG)
 def objective(trial):
     try:
         # set hyperparameters
         args = parse_args()
         args.mode = 'optim' # optim mode
         # data
-        args.noise_dim = trial.suggest_categorical('noise_dim', [8, 16, 32, 64])
+        args.noise_dim = trial.suggest_categorical('noise_dim', [32, 64, 128])
         # model
         args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [32, 64, 128])
         args.num_layers_g = trial.suggest_categorical('num_layers_g', [1, 2, 3])
-        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [4, 8, 16, 32, 64])
+        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [8, 16, 32])
         args.num_layers_d = trial.suggest_categorical('num_layers_d', [4, 8, 16])
         # train
-        args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-4, log=True)
         args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-4, log=True)
-        args.epoch = trial.suggest_categorical('epoch', [300, 400, 500, 600, 700, 800, 900, 1000])
-        args.batch_size = trial.suggest_categorical('batch_size', [256, 512, 1024, 2048])
+        args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-4, log=True)
+        args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])
         args.d_iter = trial.suggest_int('d_iter', 2, 5)
-        args.gp_lambda = trial.suggest_int('gp_lambda', 5, 10)
+        args.gp_lambda = trial.suggest_int('gp_lambda', 6, 10)
         
         # prepare dataset
         stock_data = StockDataset(args, mode='optim')
@@ -51,10 +50,11 @@ def objective(trial):
 
 if __name__ == '__main__':
     study = optuna.create_study(direction='minimize')
-    study.optimize(objective, n_trials=50)
+    study.optimize(objective, n_trials=10)
     print('Best trial:')
     trial = study.best_trial
     print('  Value: {}'.format(trial.value))
     print('  Params: ')
     for key, value in trial.params.items():
         print('    {}: {}'.format(key, value))
+        print(f'--{key} {value}\\')

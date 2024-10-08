@@ -130,7 +130,7 @@ class wgan:
                 # save plot and histogram at each epoch (need to set stock evaluation dates)
                     if val_dates is not None:
                         for date in val_dates:
-                                val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args, pred_times=10)
+                                val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args)
                                 save_predict_plot(self.args, f'./logs/{self.FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
                                 save_dist_plot(self.args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[0]}_to_{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
         return results
@@ -178,7 +178,8 @@ if __name__ == '__main__':
         train_datasets, test_datasets = random_split(stock_data, [train_size, test_size])
         train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
         test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
-        val_dates = random.sample(stock_data.time_intervals, args.num_val)
+        # val_dates = random.sample(stock_data.time_intervals, args.num_val)
+        val_dates = None
         
         wgan_model = wgan(stock_data, args)
     print('----------------------------------------------------------------')
