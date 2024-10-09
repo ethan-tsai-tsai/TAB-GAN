@@ -169,7 +169,7 @@ class StockDataset(Dataset):
         self.window_size = args.window_size
         self.window_stride = args.window_stride
 
-        self.data = pd.read_csv(csv_file)
+        self.data = pd.read_csv(csv_file, index_col=0)
         self.num_features = len(self.data.columns)
         self.rolling_window()
         

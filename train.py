@@ -4,7 +4,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Subset, random_split
 from datetime import datetime
 # Import file
-from preprocessing import *
+from preprocessor import *
 from model import *
 from utils import *
 from arguments import *
@@ -14,8 +14,8 @@ class wgan:
     def __init__(self,stock_data, args):
         self.args = args
         self.device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
-        self.model_d = discriminator(stock_data.num_features, 1, self.device, self.args).to(self.device)
-        self.model_g = generator(stock_data.num_features, self.args.noise_dim, stock_data.target_length, self.device, self.args).to(self.device)
+        self.model_d = discriminator(stock_data.num_features - 1, 1, self.device, self.args).to(self.device)
+        self.model_g = generator(stock_data.num_features - 1, self.args.noise_dim, self.args.target_length//self.args.time_step, self.device, self.args).to(self.device)
         self.BEST_KLD = np.inf
 
         # initialize folder
@@ -60,7 +60,7 @@ class wgan:
         gradients_norm = torch.sqrt(torch.sum(gradients ** 2, dim=1) + 1e-12)
         return ((gradients_norm - 1) ** 2).mean()
     
-    def train(self, train_loader, test_loader, val_dates=None):
+    def train(self, train_loader, val_loader):
         # trainin set
         optimizer_d = torch.optim.Adam(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
         optimizer_g = torch.optim.Adam(self.model_g.parameters(), lr=self.args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
@@ -116,7 +116,7 @@ class wgan:
                 optimizer_g.step()
             total_loss_d += loss_d.cpu().detach().numpy()
             total_loss_g += loss_g.cpu().detach().numpy()
-            test_loss_d, test_loss_g, kld = self.test(test_loader)
+            test_loss_d, test_loss_g, kld = self.validation(val_loader)
             
             results['loss_d'].append(total_loss_d)
             results['loss_g'].append(total_loss_g)
@@ -126,18 +126,13 @@ class wgan:
             
             if (epoch+1)%(self.args.epoch//5)==0:
                 print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
-                if self.args.mode=='train':
-                # save plot and histogram at each epoch (need to set stock evaluation dates)
-                    if val_dates is not None:
-                        for date in val_dates:
-                                val_date, y_preds, y_trues = prepare_eval_data(self.model_g, stock_data, self.device, date, self.args)
-                                save_predict_plot(self.args, f'./logs/{self.FOLDER_NAME}/pred', f'{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
-                                save_dist_plot(self.args, f'./logs/{self.FOLDER_NAME}/dist', f'{val_date[0]}_to_{val_date[-1]}_epoch{epoch+1}', val_date, y_preds, y_trues)
+                
         return results
-    def test(self, test_loader):
+    
+    def validation(self, val_loader):
         with torch.inference_mode():
             total_loss_d, total_loss_g = 0, 0
-            for _, (X, y) in enumerate(test_loader):
+            for _, (X, y) in enumerate(val_loader):
                 X, y = X.to(self.device), y.to(self.device)
                 # add noise
                 self.model_g.eval()
@@ -171,17 +166,14 @@ class wgan:
     
 if __name__ == '__main__':
     args = parse_args()
-    if args.mode=='train':
-        stock_data = StockDataset(args)
-        train_size = int(0.9 * len(stock_data))
-        test_size = len(stock_data) - train_size
-        train_datasets, test_datasets = random_split(stock_data, [train_size, test_size])
-        train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
-        test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
-        # val_dates = random.sample(stock_data.time_intervals, args.num_val)
-        val_dates = None
+    train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
+    train_size = int(0.9 * len(train_datasets))
+    val_size = len(train_datasets) - train_size
+    train_data, val_data = random_split(train_datasets, [train_size, val_size])
+    train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
+    val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
         
-        wgan_model = wgan(stock_data, args)
+    wgan_model = wgan(train_datasets, args)
     print('----------------------------------------------------------------')
     print('Start training...')
     print('----------------------------------------------------------------')
@@ -189,7 +181,6 @@ if __name__ == '__main__':
     for k, v in vars(args).items():
             print("{}:\t{}".format(k, v))
     print('----------------------------------------------------------------')
-    if args.mode=='train':
-        results = wgan_model.train(train_loader, test_loader, val_dates)
-        save_loss_curve(results, args)
-        save_model(wgan_model.model_d, wgan_model.model_g, args)
+    results = wgan_model.train(train_loader, val_loader)
+    save_loss_curve(results, args)
+    save_model(wgan_model.model_d, wgan_model.model_g, args)

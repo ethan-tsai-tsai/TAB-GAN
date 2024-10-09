@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 def parse_args():
     parser = ArgumentParser()
-    parser.add_argument('--mode', type=str, default='train', help='針對不同程式設定模式')
+    parser.add_argument('--mode', type=str, choices=['train', 'optim', 'test'], default='train', help='processing mode')
     # Data
     parser.add_argument('--name', type=str, default='model', help='模型名稱')
     parser.add_argument('--stock', type=str, default='0050', help='股票編號')
