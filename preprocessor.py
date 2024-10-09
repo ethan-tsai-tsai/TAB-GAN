@@ -1,6 +1,7 @@
 import os
 import torch
 from torch.utils.data import Dataset
+import pickle
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
@@ -51,7 +52,7 @@ class DataProcessor:
         self.data = self.data.iloc[29::self.time_step, :] # 每 time_step 分鐘取一筆資料
         
         self.data['y'] = self.data['Close']
-        self.standardize() # 正規化
+        # self.standardize() # 正規化
         
         self.data['change'] = self._price_change(self.data['y'])
         
@@ -63,17 +64,14 @@ class DataProcessor:
         self.data['hour'] = self.data.index.to_series().dt.hour
         self.data['minute'] = self.data.index.to_series().dt.minute
         
-        # 取得資訊
-        self.num_features = len(self.data.drop('y', axis=1).columns) # 特徵數量
-        
-        
-        columns = [col for col in self.data.columns if col != 'y'] + ['y'] # 重新排列欄位順序
+        columns = [col for col in self.data.columns if col != 'y'] + ['y'] # arrange columns
         self.data = self.data[columns]
         
-        # 防呆
+        # prevent error
         assert not self.data.isnull().values.any(), 'There are missing values in the data.'
         assert not np.isinf(self.data.values).any(), 'There are inf values in the data.'
 
+        # split and save dataframe
         test_dataframe = self.data.iloc[-(270//self.args.time_step) * 10:, :]
         train_dataframe = self.data.iloc[:-(270//self.args.time_step), :]
 
@@ -123,14 +121,6 @@ class DataProcessor:
                 changes.append(change)
         return changes   
  
-    def standardize(self):
-        self.scaler_X = MinMaxScaler(feature_range=[-1, 1])
-        # self.scaler_y = MinMaxScaler(feature_range=[-1, 1])
-        col_list = list(self.data.columns)
-        col_list.remove('y')
-        self.data[col_list] = self.scaler_X.fit_transform(self.data[col_list].values)
-        # self.data['y'] = self.scaler_y.fit_transform(self.data[['y']].values)
-    
     def complete_data(self):
         new_idx = []
         for date in self.time_intervals:
@@ -163,17 +153,41 @@ class DataProcessor:
 
 class StockDataset(Dataset):
     def __init__(self, args, csv_file):
+        # setting parameters
+        self._args = args
         self.time_step = args.time_step # 每隔幾分鐘取出一筆資料
         self.target_length = args.target_length // args.time_step
         self.seq_len = args.window_size * (270 // args.time_step)
         self.window_size = args.window_size
         self.window_stride = args.window_stride
 
-        self.data = pd.read_csv(csv_file, index_col=0)
-        self.num_features = len(self.data.columns)
-        self.rolling_window()
+        # read data and set index
+        self.data = pd.read_csv(csv_file)
+        self.data['ts'] = pd.to_datetime(self.data['ts'])
+        self.data.set_index('ts', inplace=True)
         
-    def rolling_window(self):
+        # get data information
+        self.num_features = len(self.data.columns)
+        self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist()
+        
+        self._standardize() 
+        self._rolling_window()
+    
+    def _standardize(self):
+        col_list = list(self.data.columns)[:5]
+        if self._args.mode == 'train':
+            scaler = MinMaxScaler(feature_range=[-1, 1])
+            self.data[col_list] = scaler.fit_transform(self.data[col_list].values)
+            # save the scaler for testing purposes
+            with open(f'./data/{self._args.stock}/scaler.pkl', 'wb') as f:
+                pickle.dump(scaler, f)
+        else:
+            # load saved scaler
+            with open(f'./data/{self._args.stock}/scaler.pkl', 'rb') as f:
+                scaler = pickle.load(f)
+            self.data[col_list] = scaler.transform(self.data[col_list].values)
+    
+    def _rolling_window(self):
         self.X, self.y = [], []
         for i in range(0, len(self.data) - self.seq_len - self.target_length, self.window_stride):
             self.X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)

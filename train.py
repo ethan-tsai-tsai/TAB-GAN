@@ -155,7 +155,7 @@ class wgan:
                 kld = calc_kld(fake_data.cpu().detach().numpy(), real_data.cpu().detach().numpy(), 100, 0, 1)
                 if kld < self.BEST_KLD and kld != np.inf:
                     self.BEST_KLD = kld
-                    if self.args.mode=='train': # do not print messages when bayesian optimization
+                    if self.args.mode=='train': # do not print messages when choosing other mode
                         torch.save({
                             'args': self.args,
                             'model_d': self.model_d.state_dict(),
