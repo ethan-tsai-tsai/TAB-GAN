@@ -19,14 +19,16 @@ if __name__ == '__main__':
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
     target_length = args.target_length // args.time_step
     
-    test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
+    test_datasets = StockDataset(args, f'./data/{args.stock}/test copy.csv')
     model_g = generator(test_datasets.num_features - 1, args.noise_dim, target_length, device, args)
     time_interval = test_datasets.time_intervals[args.window_size + 1:]
     
     # load best model and arguments
     check_point = torch.load(f'./model/{FILE_NAME}_best.pth')
     model_g.load_state_dict(check_point['model_g'])
-    for key, value in vars(check_point['args']).items(): setattr(args, key, value)
+    for key, value in vars(check_point['args']).items(): 
+        if key not in ['pred_times', 'bound_percent']:
+            setattr(args, key, value)
     
     test_loader = DataLoader(test_datasets, args.batch_size, shuffle=False)
     plot_util = plot_predicions(path=f'./img/{FILE_NAME}', args=args, time_interval=time_interval)

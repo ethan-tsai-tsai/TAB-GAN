@@ -113,8 +113,8 @@ class plot_predicions:
             x_val = np.arange(i, i + self.seq_len)
             # ploting
             sns.lineplot(x=x_val, y=y, color='black')
-            sns.scatterplot(x=x_val.repeat(self.args.pred_times), y=y_hat, alpha=0.3, color=palette[i])
-            plt.fill_between(x_val, lower_bound, upper_bound, color=palette[i], alpha=0.8)
+            sns.scatterplot(x=x_val.repeat(self.args.pred_times), y=y_hat, alpha=0.2, color=palette[i])
+            plt.fill_between(x_val, lower_bound, upper_bound, color='gray', alpha=0.8, zorder=10)
             
         plt.xlabel('Time')
         plt.ylabel('Price')
@@ -148,7 +148,6 @@ class plot_predicions:
             # set values
             y = np.array(y_true[i*self.seq_len])
             y_hat = []
-            # 待處理
             for idx, sublist in enumerate(y_pred[i * self.seq_len: (i + 1) * self.seq_len]):
                 if idx == 0: y_hat.append(sublist)
                 else: y_hat.append(sublist[:-idx:, :])

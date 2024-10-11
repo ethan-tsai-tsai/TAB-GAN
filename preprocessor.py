@@ -195,7 +195,7 @@ class StockDataset(Dataset):
     def _rolling_window(self):
         self.X, self.y = [], []
         for i in range(0, len(self.data) - self.seq_len - self.target_length, self.window_stride):
-            self.X.append(self.data.iloc[i:i+self.seq_len, :len(self.data.columns)-1].values)
+            self.X.append(self.data.iloc[i:i+self.seq_len+1, :len(self.data.columns)-1].values)
             self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values)
     
     def __len__(self):
