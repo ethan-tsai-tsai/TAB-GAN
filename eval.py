@@ -21,6 +21,7 @@ if __name__ == '__main__':
     
     test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     model_g = generator(test_datasets.num_features - 1, args.noise_dim, target_length, device, args)
+    time_interval = test_datasets.time_intervals[args.window_size + 1:]
     
     # load best model and arguments
     check_point = torch.load(f'./model/{FILE_NAME}_best.pth')
@@ -28,7 +29,7 @@ if __name__ == '__main__':
     for key, value in vars(check_point['args']).items(): setattr(args, key, value)
     
     test_loader = DataLoader(test_datasets, args.batch_size, shuffle=False)
-    plot_util = plot_predicions(path=f'./img/{FILE_NAME}', args=args, time_interval=test_datasets.time_intervals)
+    plot_util = plot_predicions(path=f'./img/{FILE_NAME}', args=args, time_interval=time_interval)
     print('------------------------------------------------------------------------------------------------')
     print(f'Evaluating model: {args.name}')
     print(f'Stock: {args.stock}')

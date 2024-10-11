@@ -127,7 +127,8 @@ class plot_predicions:
         """
         plot single time prediction with scatter plot and histogram
         """
-        for date in self.time_interval:
+        palette = sns.color_palette('pastel', self.seq_len)
+        for i, date in enumerate(self.time_interval):
             if not os.path.exists(f'{self.path}/{date}'): os.mkdir(f'{self.path}/{date}')
             else: clear_folder(f'{self.path}/{date}')
             # create axes
@@ -135,9 +136,8 @@ class plot_predicions:
             gs = mpl.gridspec.GridSpec(1, 2, width_ratios=[3, 1])
             ax1 = fig.add_subplot(gs[0])
             ax2 = fig.add_subplot(gs[1])
-            # plot unchanged parts
             x_val = np.arange(self.seq_len)
-            sns.lineplot(x=x_val, y=y_true, color='black', ax=ax1)
+            # plot unchanged parts
             ax1.set_xlabel('Time')
             ax1.set_ylabel('Price')
             ax1.set_xticks(x_val)
@@ -145,44 +145,29 @@ class plot_predicions:
             ax2.set_xlabel('Price')
             ax2.set_ylabel('P(Price)')
             
-            upper_bound_list = []
-            lower_bound_list = []
+            # set values
+            y = np.array(y_true[i*self.seq_len])
+            y_hat = []
+            # 待處理
+            for idx, sublist in enumerate(y_pred[i * self.seq_len: (i + 1) * self.seq_len]):
+                if idx == 0: y_hat.append(sublist)
+                else: y_hat.append(sublist[:-idx:, :])
             
-            # plot every time unit
-            for i in range(self.target_len - 1):
-                current_pred = np.array([])
-                for ind, sublist in enumerate(y_pred[i:]):
-                    if ind < len(sublist):
-                        if ind == 0: current_pred = np.concatenate((current_pred, sublist))
-                        else: current_pred = np.concatenate((current_pred, sublist[:-ind * self.args.pred_times]))
-                
-                lengths = [x for x in range(self.target_len * self.args.pred_times, i * self.args.pred_times, -self.args.pred_times)]
-                
-                upper_bound, lower_bound = self._get_bound(current_pred, lengths)
-                current_x_val = np.repeat(np.arange(i, self.target_len), np.arange(self.target_len * self.args.pred_times, i * self.args.pred_times, -self.args.pred_times))
-                
-                # band plot
-                ax1.collections.clear()
-                sns.scatterplot(x=current_x_val, y=current_pred, color='blue', ax=ax1, alpha=0.5)
-                ax1.fill_between(x_val[i::], lower_bound, upper_bound, color='blue', alpha=0.5)  # Current area
-                
-                # Plot the previous bound area
-                if upper_bound_list and lower_bound_list:
-                    for ind in range(len(upper_bound_list)):
-                        ax1.fill_between(x_val[ind::], lower_bound_list[ind], upper_bound_list[ind], color='lightblue', alpha=0.15)
-                        
-                # Update the bound list for the next iteration
-                upper_bound_list.append(upper_bound)
-                lower_bound_list.append(lower_bound)
-                
+            # band plot
+            sns.lineplot(x=x_val, y=y, color='black', ax=ax1)
+            for j in range(self.seq_len):
+                upper_bound, lower_bound = self._get_bound(y_hat[j])
+                x_val = np.arange(j, self.seq_len)
+                sns.scatterplot(x=x_val.repeat(self.args.pred_times), y=y_hat[j].flatten(), color=palette[j], ax=ax1, alpha=0.3)
+                ax1.fill_between(x_val, lower_bound, upper_bound, color=palette[j], alpha=0.7)
                 # histogram
                 ax2.cla()
-                sns.histplot(x=current_pred[:self.seq_len*self.args.pred_times], stat='density', color='blue', alpha=0.3, ax=ax2)
-                ax2.axvline(x=y_true[i], color='black', linestyle='--', linewidth=5)
+                sns.histplot(x=y_hat[j][0], stat='density', color='blue', alpha=0.3, ax=ax2)
+                ax2.axvline(x=y_true[i*self.seq_len][j], color='black', linestyle='--', linewidth=5)
                 
-                # save fig
-                ax1.set_title(f'{date} - {self.time_array[i]}')
-                plt.savefig(f'{self.path}/{date}/{self.time_array[i]}.png')
+                # # save fig
+                ax1.set_title(f'{date} - {self.time_array[j]}')
+                plt.savefig(f'{self.path}/{date}/{self.time_array[j]}.png')
             plt.close()
         
     def _get_time_interval(self):
