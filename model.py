@@ -98,7 +98,6 @@ class generator(nn.Module):
         cond_latent = cond[:, -1, :]  # 取出最後一個時間步的輸出
         fc_input = torch.cat((cond_latent, noise), dim=1)
         out = self.fc(fc_input)
-        out = out.unsqueeze(2)
         return out
 
 class discriminator(nn.Module):

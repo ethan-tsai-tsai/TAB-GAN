@@ -49,7 +49,7 @@ class DataProcessor:
         self.data = self.data.iloc[270::, :]
         
         # ※根據處理資料的方式，分為在切割資料前和後
-        self.data = self.data.iloc[29::self.time_step, :] # 每 time_step 分鐘取一筆資料
+        self.data = self.data.iloc[::self.time_step, :] # 每 time_step 分鐘取一筆資料
         
         self.data['y'] = self.data['Close']
         # self.standardize() # 正規化
@@ -176,16 +176,23 @@ class StockDataset(Dataset):
     def _standardize(self):
         col_list = list(self.data.columns)[:5]
         if self._args.mode == 'train':
-            scaler = MinMaxScaler(feature_range=[-1, 1])
-            self.data[col_list] = scaler.fit_transform(self.data[col_list].values)
+            scaler_X = MinMaxScaler(feature_range=[-1, 1])
+            scaler_y = MinMaxScaler(feature_range=[-1, 1])
+            self.data[col_list] = scaler_X.fit_transform(self.data[col_list].values)
+            self.data['y'] = scaler_y.fit_transform(self.data[['y']].values)
             # save the scaler for testing purposes
-            with open(f'./data/{self._args.stock}/scaler.pkl', 'wb') as f:
-                pickle.dump(scaler, f)
+            with open(f'./data/{self._args.stock}/scaler_X.pkl', 'wb') as f:
+                pickle.dump(scaler_X, f)
+            with open(f'./data/{self._args.stock}/scaler_y.pkl', 'wb') as f:
+                pickle.dump(scaler_y, f)
         else:
             # load saved scaler
-            with open(f'./data/{self._args.stock}/scaler.pkl', 'rb') as f:
-                scaler = pickle.load(f)
-            self.data[col_list] = scaler.transform(self.data[col_list].values)
+            with open(f'./data/{self._args.stock}/scaler_X.pkl', 'rb') as f:
+                scaler_X = pickle.load(f)
+            with open(f'./data/{self._args.stock}/scaler_y.pkl', 'rb') as f:
+                scaler_y = pickle.load(f)
+            self.data[col_list] = scaler_X.transform(self.data[col_list].values)
+            self.data['y'] = scaler_y.transform(self.data[['y']].values)
     
     def _rolling_window(self):
         self.X, self.y = [], []
