@@ -37,7 +37,7 @@ class DataProcessor:
         
          # 補全缺失值
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
-        self.complete_data() 
+        self._complete_data() 
         
          # 加入欄位
         ## Technical Indicators
@@ -52,8 +52,6 @@ class DataProcessor:
         self.data = self.data.iloc[::self.time_step, :] # 每 time_step 分鐘取一筆資料
         
         self.data['y'] = self.data['Close']
-        # self.standardize() # 正規化
-        
         self.data['change'] = self._price_change(self.data['y'])
         
         ## Date Columns
@@ -121,7 +119,7 @@ class DataProcessor:
                 changes.append(change)
         return changes   
  
-    def complete_data(self):
+    def _complete_data(self):
         new_idx = []
         for date in self.time_intervals:
             start_time = pd.to_datetime(date + ' 09:01:00')
@@ -174,7 +172,7 @@ class StockDataset(Dataset):
         self._rolling_window()
     
     def _standardize(self):
-        col_list = list(self.data.columns)[:5]
+        col_list = list(self.data.columns)[:6]
         if self._args.mode == 'train':
             scaler_X = MinMaxScaler(feature_range=[-1, 1])
             scaler_y = MinMaxScaler(feature_range=[-1, 1])

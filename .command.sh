@@ -51,59 +51,7 @@ nohup python -u train.py \
     --epoch 300\
     > ./out/2330.out 2>&1 &
 ## 2610
-nohup python -u train.py \
-    --stock 2610\
-    --cuda 7\
-    --noise_dim 64\
-    --hidden_dim_g 64\
-    --num_layers_g 1\
-    --hidden_dim_d 8\
-    --num_layers_d 4\
-    --lr_d 5.3651777572607416e-05\
-    --lr_g 6.504768788382191e-05\
-    --batch_size 256\
-    --d_iter 4\
-    --gp_lambda 7\
-    --epoch 300\
-    > ./out/2610.out 2>&1 &
-
-# evaluation
-python eval.py\
-    --stock 2610\
-    --cuda 7\
-    --noise_dim 8\
-    --hidden_dim_g 32\
-    --num_layers_g 1\
-    --hidden_dim_d 8\
-    --num_layers_d 4\
-    --lr_g 2.5519988501236693e-05\
-    --lr_d 3.855035071257917e-05\
-    --epoch 325\
-    --batch_size 1024\
-    --d_iter 3\
-    --gp_lambda 9\
-    --num_days 2\
-    --pred_times 100\
-    --bound_percent 90&
-python eval.py --stock 1101 --cuda 1 &
-python eval.py --stock 2330 --cuda 2 &
-python eval.py\
-    --stock 0050\
-    --cuda 4\
-    --noise_dim 128\
-    --hidden_dim_g 128\
-    --num_layers_g 2\
-    --hidden_dim_d 32\
-    --num_layers_d 4\
-    --lr_d 1.627586045088271e-05\
-    --lr_g 6.798561810926697e-05\
-    --batch_size 128\
-    --d_iter 5\
-    --gp_lambda 6\
-    --epoch 300\
-    --num_days 2\
-    --pred_times 100\
-    --bound_percent 90&
+nohup python -u train.py --stock 2610 --cuda 7&
 
 # bayes optimization
 nohup python -u bayes_optim.py --stock 0050 --cuda 6 > ./out/optim_0050.out 2>&1 &

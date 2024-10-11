@@ -73,23 +73,6 @@ def clear_folder(folder_path):
         except Exception as e:
             print(f"刪除 {file_path} 時發生錯誤: {e}")
 
-def arrange_time(time_list, n, window_step):
-    """
-    n: number of time points
-    """
-    # [18, 9]
-    indicies = [0] * len(time_list)
-    output = []
-    for group_size in range(1, sum(len(row) for row in time_list)):
-        sublist = []
-        for i in range(min(group_size, len(time_list))):
-            if indicies[i] < len(time_list[i]):
-                sublist.append(time_list[i][indicies[i]])
-                indicies[i] += window_step
-        if len(sublist)!=0:
-            output.append(sublist)
-    return output
-
 class plot_predicions:
     def __init__(self, path, args, time_interval):
         self.args = args
@@ -137,72 +120,73 @@ class plot_predicions:
             
         plt.xlabel('Time')
         plt.ylabel('Price')
-        plt.xticks(ticks=x_val[::self.seq_len], labels=self.time_array[0] * len(self.time_interval))
+        plt.xticks(ticks=range(0, y_pred.shape[0], self.seq_len), labels=[self.time_array[0]] * len(self.time_interval))
         plt.legend().remove()
         plt.savefig(f'{self.path}/{file_name}_bound.png')
         plt.close()
     
-    def single_time_plot(self, y_true, y_pred, date):
+    def single_time_plot(self, y_true, y_pred):
         """
         plot single time prediction with scatter plot and histogram
         """
-        if not os.path.exists(f'{self.path}/{date}'): os.mkdir(f'{self.path}/{date}')
-        
-        # create axes
-        fig = plt.figure(figsize=(10, 5))
-        gs = mpl.gridspec.GridSpec(1, 2, width_ratios=[3, 1])
-        ax1 = fig.add_subplot(gs[0])
-        ax2 = fig.add_subplot(gs[1])
-        
-        # plot unchanged parts
-        x_val = np.arange(self.seq_len)
-        sns.lineplot(x=x_val, y=y_true, color='black', ax=ax1)
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Price')
-        ax1.set_xticks(x_val)
-        ax1.set_xticklabels(self.time_array)
-        ax2.set_xlabel('Price')
-        ax2.set_ylabel('P(Price)')
-        
-        upper_bound_list = []
-        lower_bound_list = []
-        
-        # plot every time unit
-        for i in range(self.target_len - 1):
-            current_pred = np.array([])
-            for ind, sublist in enumerate(y_pred[i:]):
-                if ind < len(sublist):
-                    if ind == 0: current_pred = np.concatenate((current_pred, sublist))
-                    else: current_pred = np.concatenate((current_pred, sublist[:-ind * self.args.pred_times]))
+        for date in enumerate(self.time_interval):
+            if not os.path.exists(f'{self.path}/{date}'): os.mkdir(f'{self.path}/{date}')
+            else: clear_folder(f'{self.path}/{date}')
+            # create axes
+            fig = plt.figure(figsize=(10, 5))
+            gs = mpl.gridspec.GridSpec(1, 2, width_ratios=[3, 1])
+            ax1 = fig.add_subplot(gs[0])
+            ax2 = fig.add_subplot(gs[1])
             
-            lengths = [x for x in range(self.target_len * self.args.pred_times, i * self.args.pred_times, -self.args.pred_times)]
+            # plot unchanged parts
+            x_val = np.arange(self.seq_len)
+            sns.lineplot(x=x_val, y=y_true, color='black', ax=ax1)
+            ax1.set_xlabel('Time')
+            ax1.set_ylabel('Price')
+            ax1.set_xticks(x_val)
+            ax1.set_xticklabels(self.time_array)
+            ax2.set_xlabel('Price')
+            ax2.set_ylabel('P(Price)')
             
-            upper_bound, lower_bound = self._get_bound(current_pred, lengths)
-            current_x_val = np.repeat(np.arange(i, self.target_len), np.arange(self.target_len * self.args.pred_times, i * self.args.pred_times, -self.args.pred_times))
+            upper_bound_list = []
+            lower_bound_list = []
             
-            # band plot
-            ax1.collections.clear()
-            sns.scatterplot(x=current_x_val, y=current_pred, color='blue', ax=ax1, alpha=0.5)
-            ax1.fill_between(x_val[i::], lower_bound, upper_bound, color='blue', alpha=0.5)  # Current area
-            
-            # Plot the previous bound area
-            if upper_bound_list and lower_bound_list:
-                for ind in range(len(upper_bound_list)):
-                    ax1.fill_between(x_val[ind::], lower_bound_list[ind], upper_bound_list[ind], color='lightblue', alpha=0.15)
-                    
-            # Update the bound list for the next iteration
-            upper_bound_list.append(upper_bound)
-            lower_bound_list.append(lower_bound)
-            
-            # histogram
-            ax2.cla()
-            sns.histplot(x=current_pred[:self.seq_len*self.args.pred_times], stat='density', color='blue', alpha=0.3, ax=ax2)
-            ax2.axvline(x=y_true[i], color='black', linestyle='--', linewidth=5)
-            
-            # save fig
-            ax1.set_title(f'{date} - {self.time_array[i]}')
-            plt.savefig(f'{self.path}/{date}/{self.time_array[i]}.png')
-        plt.close()
+            # plot every time unit
+            for i in range(self.target_len - 1):
+                current_pred = np.array([])
+                for ind, sublist in enumerate(y_pred[i:]):
+                    if ind < len(sublist):
+                        if ind == 0: current_pred = np.concatenate((current_pred, sublist))
+                        else: current_pred = np.concatenate((current_pred, sublist[:-ind * self.args.pred_times]))
+                
+                lengths = [x for x in range(self.target_len * self.args.pred_times, i * self.args.pred_times, -self.args.pred_times)]
+                
+                upper_bound, lower_bound = self._get_bound(current_pred, lengths)
+                current_x_val = np.repeat(np.arange(i, self.target_len), np.arange(self.target_len * self.args.pred_times, i * self.args.pred_times, -self.args.pred_times))
+                
+                # band plot
+                ax1.collections.clear()
+                sns.scatterplot(x=current_x_val, y=current_pred, color='blue', ax=ax1, alpha=0.5)
+                ax1.fill_between(x_val[i::], lower_bound, upper_bound, color='blue', alpha=0.5)  # Current area
+                
+                # Plot the previous bound area
+                if upper_bound_list and lower_bound_list:
+                    for ind in range(len(upper_bound_list)):
+                        ax1.fill_between(x_val[ind::], lower_bound_list[ind], upper_bound_list[ind], color='lightblue', alpha=0.15)
+                        
+                # Update the bound list for the next iteration
+                upper_bound_list.append(upper_bound)
+                lower_bound_list.append(lower_bound)
+                
+                # histogram
+                ax2.cla()
+                sns.histplot(x=current_pred[:self.seq_len*self.args.pred_times], stat='density', color='blue', alpha=0.3, ax=ax2)
+                ax2.axvline(x=y_true[i], color='black', linestyle='--', linewidth=5)
+                
+                # save fig
+                ax1.set_title(f'{date} - {self.time_array[i]}')
+                plt.savefig(f'{self.path}/{date}/{self.time_array[i]}.png')
+            plt.close()
         
     def _get_time_interval(self):
         # 取得時間陣列
