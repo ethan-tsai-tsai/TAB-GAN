@@ -2,11 +2,9 @@ import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
-import math
 import os
 import numpy as np
-from datetime import datetime, timedelta, time
-from random import choice
+from datetime import datetime, timedelta
 
 def calc_kld(generated_data, ground_truth):
     pd_gt, _ = np.histogram(ground_truth, bins='auto', density=True)
@@ -129,7 +127,7 @@ class plot_predicions:
         """
         plot single time prediction with scatter plot and histogram
         """
-        for date in enumerate(self.time_interval):
+        for date in self.time_interval:
             if not os.path.exists(f'{self.path}/{date}'): os.mkdir(f'{self.path}/{date}')
             else: clear_folder(f'{self.path}/{date}')
             # create axes
@@ -137,7 +135,6 @@ class plot_predicions:
             gs = mpl.gridspec.GridSpec(1, 2, width_ratios=[3, 1])
             ax1 = fig.add_subplot(gs[0])
             ax2 = fig.add_subplot(gs[1])
-            
             # plot unchanged parts
             x_val = np.arange(self.seq_len)
             sns.lineplot(x=x_val, y=y_true, color='black', ax=ax1)

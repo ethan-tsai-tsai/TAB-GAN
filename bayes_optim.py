@@ -34,7 +34,6 @@ def objective(trial):
         train_datasets, test_datasets = random_split(stock_data, [train_size, test_size])
         train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
         test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
-        val_dates = random.sample(stock_data.time_intervals, args.num_val)
         
         print(f'Starting trial with params: {trial.params}')
         # model setup
