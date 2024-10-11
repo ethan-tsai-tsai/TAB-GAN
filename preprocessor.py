@@ -73,7 +73,7 @@ class DataProcessor:
 
         # split and save dataframe
         test_dataframe = self.data.iloc[-(270//self.args.time_step) * 10:, :]
-        train_dataframe = self.data.iloc[:-(270//self.args.time_step), :]
+        train_dataframe = self.data.iloc[:-(270//self.args.time_step) * 10, :]
 
         train_dataframe.to_csv(f'{path}/train.csv')
         test_dataframe.to_csv(f'{path}/test.csv')

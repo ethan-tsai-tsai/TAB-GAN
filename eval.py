@@ -37,15 +37,6 @@ if __name__ == '__main__':
     # predict
     wgan_model = wgan(test_datasets, args)
     y_preds, y_trues = wgan_model.predict(test_loader)
-    # band plot
-    plot_util.band_plot(y_trues, y_preds)
-    # dist plot
-    # chunk_size = len(y_preds_arrange) // args.num_days
-    # y_preds_arrange_split = [y_preds_arrange[i * chunk_size: (i + 1) * chunk_size] for i in range(args.num_days)]
-    # y_trues_arrange_split = [y_trues_arrange[i * chunk_size: (i + 1) * chunk_size] for i in range(args.num_days)]
-    # y_trues_arrange_dist = np.array([sum(parts, []) for parts in zip(*y_trues_arrange_split)])
-    # y_preds_arrange_dist = np.array([sum(parts, []) for parts in zip(*y_preds_arrange_split)])
-    plot_util.dist_plot(y_trues, y_preds)
-    # # single date plot
-    # if args.num_days==1:
-    #     plot_util.single_time_plot(np.array([y[0] for y in y_trues_arrange]), np.array(y_preds_arrange), date)
+    plot_util.band_plot(y_trues, y_preds) # bound plot
+    plot_util.dist_plot(y_trues, y_preds) # dist plot
+    plot_util.single_time_plot(y_trues, y_preds) # single date plot

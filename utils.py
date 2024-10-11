@@ -103,14 +103,18 @@ class plot_predicions:
         else: clear_folder(self.path)
     
     def dist_plot(self, y_true, y_pred):
+        # processse array
+        arrange_y_pred = y_pred.transpose(1, 0, 2).reshape(y_pred.shape[1], y_pred.shape[0] * y_pred.shape[2])
+        arrange_y_true = y_true.T
+
         file_name = f'{self.time_interval[0]} - {self.time_interval[-1]}'
         _, axes = plt.subplots(3, 3, figsize=(12, 12))
         for i, ax in enumerate(axes.flat):
-            sns.histplot(y_pred[i], ax=ax, stat='density', color='green', alpha=0.3)
-            if self.args.num_days == 1:
-                ax.axvline(x=y_true[i][0], color='black', linestyle='--', linewidth=5)
+            sns.histplot(arrange_y_pred[i], ax=ax, stat='density', color='green', alpha=0.3)
+            if len(arrange_y_true[i]) == 1:
+                ax.axvline(x=arrange_y_true[i], color='black', linestyle='--', linewidth=5)
             else:
-                sns.histplot(y_true[i], ax=ax, stat='density', color='red', alpha=0.3)
+                sns.histplot(arrange_y_true[i], ax=ax, stat='density', color='red', alpha=0.3)
             ax.set_title(f'{self.time_array[i]}')
         plt.tight_layout()
         plt.savefig(f'{self.path}/{file_name}_dist.png')
