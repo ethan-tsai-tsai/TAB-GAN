@@ -28,17 +28,17 @@ def objective(trial):
         args.gp_lambda = trial.suggest_int('gp_lambda', 6, 10)
         
         # prepare dataset
-        stock_data = StockDataset(args, mode='optim')
-        train_size = int(0.9 * len(stock_data))
-        test_size = len(stock_data) - train_size
-        train_datasets, test_datasets = random_split(stock_data, [train_size, test_size])
-        train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
-        test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
+        train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
+        train_size = int(0.9 * len(train_datasets))
+        val_size = len(train_datasets) - train_size
+        train_data, val_data = random_split(train_datasets, [train_size, val_size])
+        train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
+        val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
         
         print(f'Starting trial with params: {trial.params}')
         # model setup
-        wgan_model = wgan(stock_data, args)
-        _ = wgan_model.train(train_loader, test_loader)
+        wgan_model = wgan(train_datasets, args)
+        _ = wgan_model.train(train_loader, val_loader)
         
         score = wgan_model.BEST_KLD
         return score
