@@ -1,8 +1,7 @@
 from torch.utils.data import DataLoader, Subset
 import optuna
 import logging
-import random
-import utils
+import pickle
 from arguments import *
 from preprocessor import *
 from train import *
@@ -11,7 +10,6 @@ optuna.logging.set_verbosity(optuna.logging.DEBUG)
 def objective(trial):
     try:
         # set hyperparameters
-        args = parse_args()
         args.mode = 'optim' # optim mode
         # data
         args.noise_dim = trial.suggest_categorical('noise_dim', [32, 64, 128])
@@ -49,6 +47,7 @@ def objective(trial):
     
 
 if __name__ == '__main__':
+    args = parse_args()
     study = optuna.create_study(direction='minimize')
     study.optimize(objective, n_trials=10)
     print('Best trial:')
@@ -58,3 +57,6 @@ if __name__ == '__main__':
     for key, value in trial.params.items():
         print('    {}: {}'.format(key, value))
         print(f'--{key} {value}\\')
+    
+    with open(f'./model/{args.stock}_{args.name}.pkl', 'wb') as f:
+        pickle.dump(trial.params, f)

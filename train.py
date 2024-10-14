@@ -206,8 +206,13 @@ if __name__ == '__main__':
     print('Start training...')
     print('----------------------------------------------------------------')
     print('hyperparameters: ')
+    filter_val = ['noise_dim', 
+                  'epoch', 'batch_size', 
+                  'hidden_dim_g', 'num_layers_g', 'lr_g',
+                  'hidden_dim_d', 'num_layers_d', 'lr_d',
+                  'd_iter', 'gp_lambda']
     for k, v in vars(args).items():
-            print("{}:\t{}".format(k, v))
+        if k in filter_val: print("{}:\t{}".format(k, v))
     print('----------------------------------------------------------------')
     results = wgan_model.train(train_loader, val_loader)
     save_loss_curve(results, args)

@@ -173,7 +173,7 @@ class StockDataset(Dataset):
     
     def _standardize(self):
         col_list = list(self.data.columns)[:6]
-        if self._args.mode == 'train':
+        if self._args.mode in ['train', 'optim']:
             scaler_X = MinMaxScaler(feature_range=[-1, 1])
             scaler_y = MinMaxScaler(feature_range=[-1, 1])
             self.data[col_list] = scaler_X.fit_transform(self.data[col_list].values)

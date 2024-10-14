@@ -9,7 +9,6 @@ def parse_args():
     parser.add_argument('--window_size', type=int, default=3, help='移動窗格大小（用幾天的資料量來預測下一天）')
     parser.add_argument('--window_stride', type=int, default=1, help='移動窗格的移動步伐')
     parser.add_argument('--target_length', type=int, default=270, help='生成器輸出的序列長度')
-    parser.add_argument('--noise_dim', type=int, default=32, help='輸入生成器的噪聲維度')
     parser.add_argument('--time_step', type=int, default=30, help="輸入為每N分鐘的資料")
     
     # Model
@@ -23,6 +22,7 @@ def parse_args():
     parser.add_argument('--lr_d', type=float, default=0.00001, help='discriminator learning rate')
     parser.add_argument('--cuda', type=int, default=2, help='cuda number')
     parser.add_argument('--epoch', type=int, default=100, help='number of epochs')
+    parser.add_argument('--noise_dim', type=int, default=32, help='輸入生成器的噪聲維度')
     parser.add_argument('--batch_size', type=int, default=256, help='batch size')
     parser.add_argument('--d_iter', type=int, default=5, help='iteration of training discriminator before training generator')
     parser.add_argument('--gp_lambda', type=float, default=10, help='lambda of gradient penalty')
