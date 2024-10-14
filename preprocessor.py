@@ -13,7 +13,7 @@ class DataProcessor:
     def __init__(self, args):
         path = f'./data/{args.stock}'
         if not os.path.exists(path): os.makedirs(path)
-        else: clear_folder(path)
+        # else: clear_folder(path)
                
         self.args = args
         
@@ -147,7 +147,7 @@ class DataProcessor:
         # 遞迴
         if self.data.isnull().values.any():
             # print(f'Data still has {self.data.isnull().sum().sum()} missing value, try again complete data.')
-            self.complete_data()    
+            self._complete_data()    
 
 class StockDataset(Dataset):
     def __init__(self, args, csv_file):
