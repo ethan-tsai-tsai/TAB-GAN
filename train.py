@@ -81,7 +81,7 @@ class wgan:
                     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
                     optimizer_d.zero_grad()
                     loss_d.backward()
-                    # torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
+                    torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
                     optimizer_d.step()
                 
                 # train generator (minimize wgan loss)
@@ -90,10 +90,10 @@ class wgan:
                 loss_g = self.generator_loss(X, fake_data)
                 optimizer_g.zero_grad()
                 loss_g.backward()
-                # torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
+                torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
                 optimizer_g.step()
                 
-                # train discriminator part 2
+                # train discriminator
                 for _ in range(self.args.d_iter):
                     noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
                     fake_data = self.model_g(X, noise)
@@ -121,7 +121,7 @@ class wgan:
             results['test_loss_g'].append(test_loss_g)
             results['test_kld'].append(kld)
             
-            if (epoch+1)%(self.args.epoch//5)==0:
+            if (epoch+1)%(self.args.epoch//10)==0:
                 print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
                 
         return results
@@ -153,11 +153,8 @@ class wgan:
                 if kld < self.BEST_KLD and kld != np.inf:
                     self.BEST_KLD = kld
                     if self.args.mode=='train': # do not print messages when choosing other mode
-                        torch.save({
-                            'args': self.args,
-                            'model_d': self.model_d.state_dict(),
-                            'model_g': self.model_g.state_dict()
-                        }, f'./model/{self.args.stock}_{self.args.name}_best.pth')
+                        file_name = f'./model/{self.args.stock}_{self.args.name}_best.pth'
+                        save_model(self.model_d, self.model_g, self.args, file_name)
                         print(f'update best model with kld = {kld}')
         return total_loss_d, total_loss_g, kld
     
@@ -216,4 +213,5 @@ if __name__ == '__main__':
     print('----------------------------------------------------------------')
     results = wgan_model.train(train_loader, val_loader)
     save_loss_curve(results, args)
-    save_model(wgan_model.model_d, wgan_model.model_g, args)
+    file_name = f'./model/{args.stock}_{args.name}.pth'
+    save_model(wgan_model.model_d, wgan_model.model_g, args, file_name)

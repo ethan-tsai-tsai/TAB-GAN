@@ -93,7 +93,7 @@ class generator(nn.Module):
             h0 = torch.zeros(1, cond.size(0), self.hidden_layer_size[i]).to(self.device)
             c0 = torch.zeros(1, cond.size(0), self.hidden_layer_size[i]).to(self.device)
             cond, _ = self.lstm_list[i](cond, (h0, c0))
-            # cond = self.dropout(cond)
+            cond = self.dropout(cond)
         
         cond_latent = cond[:, -1, :]  # 取出最後一個時間步的輸出
         fc_input = torch.cat((cond_latent, noise), dim=1)

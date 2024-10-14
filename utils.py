@@ -43,8 +43,7 @@ def save_loss_curve(results, args):
     plt.legend()
     plt.savefig(f'./img/loss/{args.stock}_loss_{args.name}.png')
     
-def save_model(model_d, model_g, args):
-    print(f"Saving model")
+def save_model(model_d, model_g, args, file_name):
     # filtering args
     filter_val = ['noise_dim', 
                   'epoch', 'batch_size', 
@@ -52,12 +51,11 @@ def save_model(model_d, model_g, args):
                   'hidden_dim_d', 'num_layers_d', 'lr_d',
                   'd_iter', 'gp_lambda']
     args = {key:value for key, value in vars(args).items() if key in filter_val}
-    print(args)
     torch.save({
         'args': args,
         'model_d': model_d.state_dict(),
         'model_g': model_g.state_dict()
-    }, f'./model/{args.stock}_{args.name}.pth')
+    }, file_name)
 
 def clear_folder(folder_path):
     # 確保資料夾存在
