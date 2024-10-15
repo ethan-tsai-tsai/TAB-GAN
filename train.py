@@ -102,6 +102,7 @@ class wgan:
                     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
                     optimizer_d.zero_grad()
                     loss_d.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
                     optimizer_d.step()
                 
                 # train generator (minimize mae loss)
@@ -110,6 +111,7 @@ class wgan:
                 mae_loss = loss_fn(y, fake_data)
                 optimizer_g.zero_grad()
                 mae_loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
                 optimizer_g.step()
             total_loss_d += loss_d.cpu().detach().numpy()
             total_loss_g += loss_g.cpu().detach().numpy()
@@ -172,10 +174,13 @@ class wgan:
         with torch.inference_mode():
             for _, (X, y) in enumerate(test_loader):
                 X, y = X.to(self.device), y.to(self.device)
+                print('X', X[0])
+                print('y', y[0])
                 tmp = np.array([])
                 for _ in range(self.args.pred_times):
                     noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
                     y_pred = self.model_g(X, noise).cpu().detach().numpy()
+                    print('p',y_pred[0])
                     y_pred = scaler_y.inverse_transform(y_pred) # inverse transform
                     y_pred = np.expand_dims(y_pred, axis=2)
                     tmp = y_pred if tmp.size==0 else np.concatenate((tmp, y_pred), axis=2)

@@ -1,23 +1,10 @@
 # train
-nohup python -u train.py --stock 0050 --cuda 4 --epoch 100 > ./out/0050.out 2>&1 &
-nohup python -u train.py --stock 1101 --cuda 5 --epoch 100 > ./out/1101.out 2>&1 &
-nohup python -u train.py --stock 2330 --cuda 6 --epoch 100 > ./out/2330.out 2>&1 &
+nohup python -u train.py --stock 0050 --cuda 4 --epoch 100 --hidden_dim_d 256 --num_layers_d 4 > ./out/0050.out 2>&1 &
+nohup python -u train.py --stock 1101 --cuda 5 --epoch 100 --hidden_dim_d 256 --num_layers_d 4 > ./out/1101.out 2>&1 &
+nohup python -u train.py --stock 2330 --cuda 6 --epoch 100 --hidden_dim_d 256 --num_layers_d 4 > ./out/2330.out 2>&1 &
+nohup python -u train.py --stock 2610 --cuda 7 --epoch 100 --hidden_dim_d 256 --num_layers_d 4 > ./out/2610.out 2>&1 &
 ## 0050
-nohup python -u train.py \
-    --stock 0050\
-    --cuda 4\
-    --noise_dim 128\
-    --hidden_dim_g 128\
-    --num_layers_g 2\
-    --hidden_dim_d 32\
-    --num_layers_d 4\
-    --lr_d 1.627586045088271e-05\
-    --lr_g 6.798561810926697e-05\
-    --batch_size 128\
-    --d_iter 5\
-    --gp_lambda 6\
-    --epoch 300\
-    > ./out/0050.out 2>&1 &
+nohup python -u train.py > ./out/0050.out 2>&1 &
 ## 1101
 nohup python -u train.py \
     --stock 1101\

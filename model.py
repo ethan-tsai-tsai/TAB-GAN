@@ -104,7 +104,9 @@ class discriminator(nn.Module):
     def __init__(self, cond_dim, x_dim, device, args):
         super(discriminator, self).__init__()
         num_channels = [args.hidden_dim_d] * args.num_layers_d
-        input_size = 1
+        input_size = args.hidden_dim_d
+        self.cond_embedding = nn.Linear(cond_dim, args.hidden_dim_d)
+        self.x_embedding = nn.Linear(1, args.hidden_dim_d)
         self.device = device
         self.tcn = TemporalConvNet(input_size, num_channels, 2, 0.1)
         self.linear = nn.Linear(num_channels[-1], 1)
@@ -114,8 +116,11 @@ class discriminator(nn.Module):
         self.linear.weight.data.normal_(0, 0.01)
     
     def forward(self, cond, x):
-        cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
-        input = torch.cat([cond, x], axis=1).unsqueeze(1)
+        cond_embedded = self.cond_embedding(cond)
+        x_embedded = self.x_embedding(x.unsqueeze(-1))
+        input = torch.cat((cond_embedded, x_embedded), dim=1).permute(0, 2, 1)  # (batch_size, seq_len_condition + seq_len_target, d_model)
+        # cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
+        # input = torch.cat([cond, x], axis=1).unsqueeze(1)
         out = self.tcn(input)
         # weight = torch.exp(torch.linspace(1, -3, out.shape[2])).to(self.device)
         # out = out * weight
@@ -123,4 +128,35 @@ class discriminator(nn.Module):
         
         return out
     
+# class discriminator(nn.Module):
+#     def __init__(self, cond_dim, x_dim, device, args):
+#         super(discriminator, self).__init__()
+#         self._args = args
+#         self.device = device
+#         self.cond_embedding = nn.Linear(cond_dim, args.hidden_dim_d)
+#         self.x_embedding = nn.Linear(1, args.hidden_dim_d)
+#         # position encoding
+#         seq_len = args.window_size * (270 // args.time_step) + 1
+#         target_len = args.target_length // args.time_step
+#         self.position_encode = nn.Parameter(torch.zeros(1, seq_len + target_len, args.hidden_dim_d))
+        
+#         encoder_layer = nn.TransformerEncoderLayer(
+#             d_model = args.hidden_dim_d,
+#             nhead = args.num_layers_d,
+#             dim_feedforward = args.hidden_dim_d * 4,
+#             dropout = 0.1
+#         )
+#         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=args.num_layers_d)
+        
+#         self.fc = nn.Linear(args.hidden_dim_d, 1)
     
+#     def forward(self, cond, x):
+#         cond_embedded = self.cond_embedding(cond)
+#         x_embedded = self.x_embedding(x.unsqueeze(-1))
+#         input = torch.cat((cond_embedded, x_embedded), dim=1)  # (batch_size, seq_len_condition + seq_len_target, d_model)
+#         input = (input + self.position_encode).permute(1, 0, 2) # (seq_len, batch_size, d_model)
+#         out = self.encoder(input)
+#         out = out[-1, :, :]
+#         out = self.fc(out)
+        
+#         return out
