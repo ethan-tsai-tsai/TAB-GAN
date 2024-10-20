@@ -58,24 +58,21 @@ def save_model(model_d, model_g, args, file_name):
     }, file_name)
 
 def clear_folder(folder_path):
-    # 確保資料夾存在
+    # Make sure the folder exists
     if not os.path.exists(folder_path):
         print(f"資料夾 {folder_path} 不存在。")
         return
-    
-    # 遍歷資料夾中的所有檔案
+
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
         try:
-            # 如果是檔案，則刪除
             if os.path.isfile(file_path):
                 os.remove(file_path)
-            # 如果是資料夾，則遞迴清空
             elif os.path.isdir(file_path):
                 clear_folder(file_path)
                 os.rmdir(file_path)
         except Exception as e:
-            print(f"刪除 {file_path} 時發生錯誤: {e}")
+            print(f"when delete {file_path} has error: {e}")
 
 class plot_predicions:
     def __init__(self, path, args, time_interval):
@@ -94,7 +91,6 @@ class plot_predicions:
         arrange_y_pred = self._arrange_list_dist(y_pred).transpose(1, 0, 2).reshape(y_pred.shape[1], y_pred.shape[0] * y_pred.shape[2])
         arrange_y_true = self._arrange_list_dist(y_true).T
 
-        file_name = f'{self.time_interval[0]} - {self.time_interval[-1]}'
         _, axes = plt.subplots(3, 3, figsize=(12, 12))
         for i, ax in enumerate(axes.flat):
             sns.histplot(arrange_y_pred[i], ax=ax, stat='density', color='green', alpha=0.3)
@@ -104,12 +100,12 @@ class plot_predicions:
                 sns.histplot(arrange_y_true[i], ax=ax, stat='density', color='red', alpha=0.3)
             ax.set_title(f'{self.time_array[i]}')
         plt.tight_layout()
-        plt.savefig(f'{self.path}/{file_name}_dist.png')
+        plt.savefig(f'{self.path}/dist.png')
         plt.close()
     
     def band_plot(self, y_true, y_pred):
-        file_name = f'{self.time_interval[0]} - {self.time_interval[-1]}'
         palette = sns.color_palette('pastel', len(self.time_interval) * self.seq_len)
+        
         plt.figure(figsize=(10, 5))
         for i, (y, y_hat) in enumerate(zip(y_true, y_pred)):
             # calculate upper and lower bound
@@ -124,9 +120,9 @@ class plot_predicions:
             
         plt.xlabel('Time')
         plt.ylabel('Price')
-        plt.xticks(ticks=range(0, y_pred.shape[0], self.seq_len), labels=[self.time_array[0]] * len(self.time_interval))
-        # plt.legend().remove()
-        plt.savefig(f'{self.path}/{file_name}_bound.png')
+        # plt.xticks(ticks=range(0, y_pred.shape[0], self.seq_len), labels=[self.time_array[0]] * len(self.time_interval))
+        plt.title(f'{self.time_interval[0]} - {self.time_interval[-1]}')
+        plt.savefig(f'{self.path}/bound.png')
         plt.close()
     
     def fixed_band_plot(self, y_true, y_pred):
@@ -155,7 +151,7 @@ class plot_predicions:
         plt.ylabel('Price')
         # plt.xticks(ticks=range(0, y_pred.shape[0], self.seq_len), labels=[self.time_array[0]] * len(self.time_interval))
         # plt.legend().remove()
-        plt.savefig(f'{self.path}/{file_name}_bound.png')
+        plt.savefig(f'{self.path}/bound_fixed.png')
         plt.close()
     
     def single_time_plot(self, y_true, y_pred):
@@ -255,6 +251,25 @@ class plot_predicions:
                 plt.savefig(f'{self.path}/{date}/{self.time_array[j]}_fixed.png')
             plt.close()
         
+    def line_chart(self, y_true, y_pred):
+        file_name = f'{self.time_interval[0]} - {self.time_interval[-1]}'
+        palette = sns.color_palette('pastel', len(self.time_interval) * self.seq_len)
+        plt.figure(figsize=(10, 5))
+        for i, (y, y_hat) in enumerate(zip(y_true, y_pred)):
+            # set values
+            y_hat = np.array(y_hat).flatten()
+            x_val = np.arange(i, i + self.seq_len)
+            # ploting
+            sns.lineplot(x=x_val, y=y, color='black')
+            sns.lineplot(x=x_val.repeat(self.args.pred_times), y=y_hat, alpha=0.2, color=palette[i])
+            
+        plt.xlabel('Time')
+        plt.ylabel('Price')
+        plt.xticks(ticks=range(0, y_pred.shape[0], self.seq_len), labels=[self.time_array[0]] * len(self.time_interval))
+        # plt.legend().remove()
+        plt.savefig(f'{self.path}/line.png')
+        plt.close()
+    
     def _get_time_interval(self):
         # 取得時間陣列
         start_time = datetime.strptime('09:00', '%H:%M')

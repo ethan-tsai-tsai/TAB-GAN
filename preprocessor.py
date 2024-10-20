@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 import pickle
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from datetime import datetime
 from utils import *
 from arguments import *
@@ -34,6 +34,7 @@ class DataProcessor:
         self.data['ts'] = pd.to_datetime(self.data['ts'])
         self.data.set_index(self.data['ts'], inplace=True)
         self.data = self.data.groupby(self.data.index).mean() # 重複日期
+        # self.data = self.data[self.data.index > '2021-01-01']
         
          # 補全缺失值
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
@@ -41,11 +42,11 @@ class DataProcessor:
         
          # 加入欄位
         ## Technical Indicators
-        # self.data['cmf'] = self._cmf()
-        # self.data['colose_ratio'] = self._close_ratio(window=self.time_step)
-        # self.data['volume_percentile'] = self._volume_percentile(window=self.time_step)
+        self.data['cmf'] = self._cmf()
+        self.data['colose_ratio'] = self._close_ratio(window=self.time_step)
+        self.data['volume_percentile'] = self._volume_percentile(window=self.time_step)
         
-        ## 切割掉第一天（技術指標大多沒有值）
+        # 切割掉第一天（技術指標大多沒有值）
         self.data = self.data.iloc[270::, :]
         
         # ※根據處理資料的方式，分為在切割資料前和後
@@ -174,8 +175,10 @@ class StockDataset(Dataset):
     def _standardize(self):
         col_list = list(self.data.columns)[:6]
         if self._args.mode in ['train', 'optim']:
-            scaler_X = MinMaxScaler(feature_range=[0, 1])
-            scaler_y = MinMaxScaler(feature_range=[0, 1])
+            # scaler_X = StandardScaler()
+            # scaler_y = StandardScaler()
+            scaler_X = MinMaxScaler(feature_range=[-1, 1])
+            scaler_y = MinMaxScaler(feature_range=[-1, 1])
             self.data[col_list] = scaler_X.fit_transform(self.data[col_list].values)
             self.data['y'] = scaler_y.fit_transform(self.data[['y']].values)
             # save the scaler for testing purposes
@@ -190,13 +193,15 @@ class StockDataset(Dataset):
             with open(f'./data/{self._args.stock}/scaler_y.pkl', 'rb') as f:
                 scaler_y = pickle.load(f)
             self.data[col_list] = scaler_X.transform(self.data[col_list].values)
-            self.data['y'] = scaler_y.transform(self.data[['y']].values)
+            if 'y' in self.data.columns:
+                self.data['y'] = scaler_y.transform(self.data[['y']].values)
     
     def _rolling_window(self):
         self.X, self.y = [], []
         for i in range(0, len(self.data) - self.seq_len - self.target_length, self.window_stride):
             self.X.append(self.data.iloc[i:i+self.seq_len+1, :len(self.data.columns)-1].values)
-            self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values)
+            if 'y' in self.data.columns:
+                self.y.append(self.data.iloc[i+self.seq_len:i+self.seq_len+self.target_length, len(self.data.columns)-1].values)
     
     def __len__(self):
         return len(self.X)

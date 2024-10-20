@@ -72,38 +72,36 @@ class wgan:
             total_loss_d, total_loss_g = 0, 0
             for _, (X, y) in enumerate(train_loader):
                 X, y = X.to(self.device), y.to(self.device)
-                # train discriminator
-                for _ in range(self.args.d_iter):
-                    noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                    fake_data = self.model_g(X, noise)
-                    assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
-                    gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
-                    loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
-                    optimizer_d.zero_grad()
-                    loss_d.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
-                    optimizer_d.step()
+                y = y.unsqueeze(-1)
+                # # train discriminator
+                # for _ in range(self.args.d_iter):
+                #     noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
+                #     fake_data = self.model_g(X, noise)
+                #     assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
+                #     gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
+                #     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
+                #     optimizer_d.zero_grad()
+                #     loss_d.backward()
+                #     optimizer_d.step()
                 
-                # train generator (minimize wgan loss)
-                noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                fake_data = self.model_g(X, noise)
-                loss_g = self.generator_loss(X, fake_data)
-                optimizer_g.zero_grad()
-                loss_g.backward()
-                torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
-                optimizer_g.step()
+                # # train generator (minimize wgan loss)
+                # noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
+                # fake_data = self.model_g(X, noise)
+                # loss_g = self.generator_loss(X, fake_data)
+                # optimizer_g.zero_grad()
+                # loss_g.backward()
+                # optimizer_g.step()
                 
-                # train discriminator
-                for _ in range(self.args.d_iter):
-                    noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                    fake_data = self.model_g(X, noise)
-                    assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
-                    gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
-                    loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
-                    optimizer_d.zero_grad()
-                    loss_d.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
-                    optimizer_d.step()
+                # # train discriminator
+                # for _ in range(self.args.d_iter):
+                #     noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
+                #     fake_data = self.model_g(X, noise)
+                #     assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
+                #     gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
+                #     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
+                #     optimizer_d.zero_grad()
+                #     loss_d.backward()
+                #     optimizer_d.step()
                 
                 # train generator (minimize mae loss)
                 noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
@@ -111,20 +109,20 @@ class wgan:
                 mae_loss = loss_fn(y, fake_data)
                 optimizer_g.zero_grad()
                 mae_loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
                 optimizer_g.step()
-            total_loss_d += loss_d.cpu().detach().numpy()
-            total_loss_g += loss_g.cpu().detach().numpy()
-            test_loss_d, test_loss_g, kld = self.validation(val_loader)
+            # total_loss_d += loss_d.cpu().detach().numpy()
+            # total_loss_g += loss_g.cpu().detach().numpy()
+            # test_loss_d, test_loss_g, kld = self.validation(val_loader)
             
-            results['loss_d'].append(total_loss_d)
-            results['loss_g'].append(total_loss_g)
-            results['test_loss_d'].append(test_loss_d)
-            results['test_loss_g'].append(test_loss_g)
-            results['test_kld'].append(kld)
+            # results['loss_d'].append(total_loss_d)
+            # results['loss_g'].append(total_loss_g)
+            # results['test_loss_d'].append(test_loss_d)
+            # results['test_loss_g'].append(test_loss_g)
+            # results['test_kld'].append(kld)
             
             if (epoch+1)%(self.args.epoch//10)==0:
-                print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
+                print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_g: {mae_loss}')
+                # print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
                 
         return results
     
@@ -160,7 +158,7 @@ class wgan:
                         print(f'update best model with kld = {kld}')
         return total_loss_d, total_loss_g, kld
     
-    def predict(self, test_loader):
+    def predict(self, X, y=None):
         # load scaler
         with open(f'./data/{self.args.stock}/scaler_y.pkl', 'rb') as f:
             scaler_y = pickle.load(f)
@@ -172,32 +170,26 @@ class wgan:
         
         # prediction
         with torch.inference_mode():
-            for _, (X, y) in enumerate(test_loader):
-                X, y = X.to(self.device), y.to(self.device)
-                print('X', X[0])
-                print('y', y[0])
-                tmp = np.array([])
-                for _ in range(self.args.pred_times):
-                    noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                    y_pred = self.model_g(X, noise).cpu().detach().numpy()
-                    print('p',y_pred[0])
-                    y_pred = scaler_y.inverse_transform(y_pred) # inverse transform
-                    y_pred = np.expand_dims(y_pred, axis=2)
-                    tmp = y_pred if tmp.size==0 else np.concatenate((tmp, y_pred), axis=2)
-                
-                y = y.cpu().detach().numpy()
-                y = scaler_y.inverse_transform(y) # inverse transform
-                
-                # concatenate array
-                y_preds = tmp if len(y_preds)==0 else np.concatenate((y_preds, tmp), axis=0) #[num_time_step, seq_len, pred_times]
-                y_trues = y if len(y_trues)==0 else np.concatenate((y_trues, y), axis=0) # [num_time_step, seq_len]
-            return y_preds, y_trues
+            X = X.to(self.device)
+            tmp = np.array([])
+            for _ in range(self.args.pred_times):
+                noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
+                y_pred = self.model_g(X, noise).squeeze().cpu().detach().numpy()
+                y_pred = scaler_y.inverse_transform(y_pred) # inverse transform
+                y_pred = np.expand_dims(y_pred, axis=2)
+                tmp = y_pred if tmp.size==0 else np.concatenate((tmp, y_pred), axis=2)
+            
+            y = scaler_y.inverse_transform(y) # inverse transform
+            # concatenate array
+            y_preds = tmp if len(y_preds)==0 else np.concatenate((y_preds, tmp), axis=0) #[num_time_step, seq_len, pred_times]
+            y_trues = y if len(y_trues)==0 else np.concatenate((y_trues, y), axis=0) # [num_time_step, seq_len]
+        return y_preds, y_trues
 
 if __name__ == '__main__':
     args = parse_args()
     args.mode = 'train'
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
-    train_size = int(0.9 * len(train_datasets))
+    train_size = int(0.95 * len(train_datasets))
     val_size = len(train_datasets) - train_size
     train_data, val_data = random_split(train_datasets, [train_size, val_size])
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
@@ -217,6 +209,6 @@ if __name__ == '__main__':
         if k in filter_val: print("{}:\t{}".format(k, v))
     print('----------------------------------------------------------------')
     results = wgan_model.train(train_loader, val_loader)
-    save_loss_curve(results, args)
+    # save_loss_curve(results, args)
     file_name = f'./model/{args.stock}_{args.name}.pth'
     save_model(wgan_model.model_d, wgan_model.model_g, args, file_name)
