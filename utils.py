@@ -115,7 +115,7 @@ class plot_predicions:
             x_val = np.arange(i, i + self.seq_len)
             # ploting
             sns.lineplot(x=x_val, y=y, color='black')
-            sns.scatterplot(x=x_val.repeat(self.args.pred_times), y=y_hat, alpha=0.2, color=palette[i])
+            sns.scatterplot(x=x_val.repeat(self.args.pred_times), y=y_hat, alpha=0.4, color=palette[i])
             plt.fill_between(x_val, lower_bound, upper_bound, color='gray', alpha=0.8, zorder=10)
             
         plt.xlabel('Time')
@@ -251,23 +251,20 @@ class plot_predicions:
                 plt.savefig(f'{self.path}/{date}/{self.time_array[j]}_fixed.png')
             plt.close()
         
-    def line_chart(self, y_true, y_pred):
-        file_name = f'{self.time_interval[0]} - {self.time_interval[-1]}'
+    def validation_chart(self, file_name, y_true, y_pred):
         palette = sns.color_palette('pastel', len(self.time_interval) * self.seq_len)
         plt.figure(figsize=(10, 5))
         for i, (y, y_hat) in enumerate(zip(y_true, y_pred)):
             # set values
-            y_hat = np.array(y_hat).flatten()
             x_val = np.arange(i, i + self.seq_len)
+            y, y_hat = np.array(y), np.array(y_hat).flatten()
             # ploting
             sns.lineplot(x=x_val, y=y, color='black')
-            sns.lineplot(x=x_val.repeat(self.args.pred_times), y=y_hat, alpha=0.2, color=palette[i])
+            sns.lineplot(x=x_val, y=np.array(y_hat), color=palette[i])
             
         plt.xlabel('Time')
         plt.ylabel('Price')
-        plt.xticks(ticks=range(0, y_pred.shape[0], self.seq_len), labels=[self.time_array[0]] * len(self.time_interval))
-        # plt.legend().remove()
-        plt.savefig(f'{self.path}/line.png')
+        plt.savefig(f'{self.path}/{file_name}.png')
         plt.close()
     
     def _get_time_interval(self):

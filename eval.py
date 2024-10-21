@@ -20,12 +20,12 @@ if __name__ == '__main__':
     target_length = args.target_length // args.time_step
     
     test_datasets = StockDataset(args, f'./data/{args.stock}/test2.csv')
-    model_g = generator(test_datasets.num_features - 1, args.noise_dim, target_length, device, args)
     time_interval = test_datasets.time_intervals[args.window_size + 1:]
+    wgan_model = wgan(test_datasets, args)
     
     # load best model and arguments
     check_point = torch.load(f'./model/{FILE_NAME}.pth')
-    model_g.load_state_dict(check_point['model_g'])
+    wgan_model.model_g.load_state_dict(check_point['model_g'])
     for key, value in check_point['args'].items(): 
         if key not in ['pred_times', 'bound_percent']:
             setattr(args, key, value)
@@ -39,11 +39,9 @@ if __name__ == '__main__':
     print('------------------------------------------------------------------------------------------------')
     
     # predict
-    wgan_model = wgan(test_datasets, args)
     y_preds, y_trues = wgan_model.predict(X, y)
     plot_util.band_plot(y_trues, y_preds) # band plot
     plot_util.fixed_band_plot(y_trues, y_preds) # fixed band plot
     plot_util.dist_plot(y_trues, y_preds) # dist plot
-    # plot_util.line_chart(y_trues, y_preds) # line chart
     plot_util.single_time_plot(y_trues, y_preds) # single date plot
     plot_util.fixed_single_time_plot(y_trues, y_preds) # fixed single date plot

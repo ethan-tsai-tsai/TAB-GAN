@@ -133,16 +133,16 @@ class generator(nn.Module):
         
         cond_latent = cond_encoded[:, -1, :]
         fc_input = torch.cat((cond_latent, noise), dim=1)
-        out = self.fc(fc_input).unsqueeze(-1)
+        out = self.fc(fc_input)
         return out
 
 # class discriminator(nn.Module):
 #     def __init__(self, cond_dim, x_dim, device, args):
 #         super(discriminator, self).__init__()
 #         num_channels = [args.hidden_dim_d] * args.num_layers_d
-#         input_size = args.hidden_dim_d
-#         self.cond_embedding = nn.Linear(cond_dim, args.hidden_dim_d)
-#         self.x_embedding = nn.Linear(1, args.hidden_dim_d)
+#         input_size = cond_dim
+#         self.cond_embedding = nn.Linear(cond_dim, input_size)
+#         self.x_embedding = nn.Linear(1, input_size)
 #         self.device = device
 #         self.tcn = TemporalConvNet(input_size, num_channels, 2, 0.1)
 #         self.linear = nn.Linear(num_channels[-1], 1)
@@ -154,13 +154,11 @@ class generator(nn.Module):
 #     def forward(self, cond, x):
 #         cond_embedded = self.cond_embedding(cond)
 #         x_embedded = self.x_embedding(x.unsqueeze(-1))
-#         input = torch.cat((cond_embedded, x_embedded), dim=1).permute(0, 2, 1)  # (batch_size, seq_len_condition + seq_len_target, d_model)
-#         # cond, x = cond.view(cond.size(0), -1), x.view(x.size(0), -1)
-#         # input = torch.cat([cond, x], axis=1).unsqueeze(1)
-#         out = self.tcn(input)
+#         input = torch.cat((cond_embedded, x_embedded), dim=1).permute(0, 2, 1)
+#         out = self.tcn(input).transpose(1, 2)
 #         # weight = torch.exp(torch.linspace(1, -3, out.shape[2])).to(self.device)
 #         # out = out * weight
-#         out = self.linear(out.transpose(1, 2))
+#         out = self.linear(out)
         
 #         return out
     
@@ -178,7 +176,7 @@ class discriminator(nn.Module):
         
         encoder_layer = nn.TransformerEncoderLayer(
             d_model = args.hidden_dim_d,
-            nhead = args.num_layers_d,
+            nhead = 8,
             dim_feedforward = args.hidden_dim_d * 4,
             dropout = 0.1
         )
