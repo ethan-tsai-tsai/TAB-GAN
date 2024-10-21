@@ -176,7 +176,7 @@ class discriminator(nn.Module):
         
         encoder_layer = nn.TransformerEncoderLayer(
             d_model = args.hidden_dim_d,
-            nhead = 8,
+            nhead = 4,
             dim_feedforward = args.hidden_dim_d * 4,
             dropout = 0.1
         )

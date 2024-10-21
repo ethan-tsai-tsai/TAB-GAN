@@ -16,10 +16,10 @@ def objective(trial):
         # model
         args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [32, 64, 128])
         args.num_layers_g = trial.suggest_categorical('num_layers_g', [1, 2, 3])
-        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [4, 8, 16, 32])
-        args.num_layers_d = trial.suggest_categorical('num_layers_d', [4, 8])
+        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [16, 32, 64])
+        args.num_layers_d = trial.suggest_categorical('num_layers_d', [2, 4])
         # train
-        args.epoch  = trial.suggest_int('epoch', 10, 100)
+        args.epoch  = trial.suggest_int('epoch', 10, 150)
         args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-4, log=True)
         args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-4, log=True)
         args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])

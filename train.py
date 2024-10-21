@@ -87,24 +87,24 @@ class wgan:
                 loss_g.backward()
                 optimizer_g.step()
                 
-                # # train discriminator
-                # for _ in range(self.args.d_iter):
-                #     noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                #     fake_data = self.model_g(X, noise)
-                #     assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
-                #     gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
-                #     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
-                #     optimizer_d.zero_grad()
-                #     loss_d.backward()
-                #     optimizer_d.step()
+                # train discriminator
+                for _ in range(self.args.d_iter):
+                    noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
+                    fake_data = self.model_g(X, noise)
+                    assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
+                    gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
+                    loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
+                    optimizer_d.zero_grad()
+                    loss_d.backward()
+                    optimizer_d.step()
                 
-                # # train generator (minimize mae loss)
-                # noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                # fake_data = self.model_g(X, noise)
-                # mae_loss = loss_fn(y, fake_data)
-                # optimizer_g.zero_grad()
-                # mae_loss.backward()
-                # optimizer_g.step()
+                # train generator (minimize mae loss)
+                noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
+                fake_data = self.model_g(X, noise)
+                mae_loss = loss_fn(y, fake_data)
+                optimizer_g.zero_grad()
+                mae_loss.backward()
+                optimizer_g.step()
             total_loss_d += loss_d.cpu().detach().numpy()
             total_loss_g += loss_g.cpu().detach().numpy()
             test_loss_d, test_loss_g, kld = self.validation(val_loader)
