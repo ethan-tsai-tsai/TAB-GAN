@@ -120,8 +120,8 @@ class plot_predicions:
     
     def dist_plot(self, y_true, y_pred):
         # process array
-        arrange_y_pred = self._arrange_list_dist(y_pred).transpose(1, 0, 2).reshape(y_pred.shape[1], y_pred.shape[0] * y_pred.shape[2])
-        arrange_y_true = self._arrange_list_dist(y_true).T
+        arrange_y_pred = self._arrange_list_dist(y_pred)
+        arrange_y_true = self._arrange_list_dist(np.expand_dims(y_true, axis=2))
 
         _, axes = plt.subplots(3, 3, figsize=(12, 12))
         for i, ax in enumerate(axes.flat):
@@ -133,6 +133,23 @@ class plot_predicions:
             ax.set_title(f'{self.time_array[i]}')
         plt.tight_layout()
         plt.savefig(f'{self.path}/dist.png')
+        plt.close()
+    
+    def fixed_dist_plot(self, y_true, y_pred):
+        # process array
+        arrange_y_pred = self._arrange_list_dist_fixed(y_pred).transpose(1, 0, 2).reshape(y_pred.shape[1], y_pred.shape[0] * y_pred.shape[2])
+        arrange_y_true = self._arrange_list_dist_fixed(y_true).T
+
+        _, axes = plt.subplots(3, 3, figsize=(12, 12))
+        for i, ax in enumerate(axes.flat):
+            sns.histplot(arrange_y_pred[i], ax=ax, stat='density', color='green', alpha=0.3)
+            if len(arrange_y_true[i]) == 1:
+                ax.axvline(x=arrange_y_true[i], color='black', linestyle='--', linewidth=5)
+            else:
+                sns.histplot(arrange_y_true[i], ax=ax, stat='density', color='red', alpha=0.3)
+            ax.set_title(f'{self.time_array[i]}')
+        plt.tight_layout()
+        plt.savefig(f'{self.path}/dist_fixed.png')
         plt.close()
     
     def band_plot(self, y_true, y_pred):
@@ -323,7 +340,15 @@ class plot_predicions:
 
         return np.array(upper_bound), np.array(lower_bound)
     
-    def _arrange_list_dist(self, list):
+    def _arrange_list_dist(self, array):
+        out = [[] for _ in range(self.seq_len)]
+        for i, item in enumerate(array):
+            idx = i % self.seq_len
+            if len(out[idx]) == 0: out[idx] = list(item[0])
+            else: out[idx] += list(item[0])
+        return np.array(out)
+    
+    def _arrange_list_dist_fixed(self, list):
         out = []
         for i, item in enumerate(list):
             if i % self.seq_len == 0: out.append(item)

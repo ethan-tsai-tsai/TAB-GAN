@@ -52,5 +52,6 @@ if __name__ == '__main__':
     plot_util.band_plot(y_trues, y_preds) # band plot
     plot_util.fixed_band_plot(y_trues, y_preds) # fixed band plot
     plot_util.dist_plot(y_trues, y_preds) # dist plot
+    plot_util.fixed_dist_plot(y_trues, y_preds) # dist plot
     plot_util.single_time_plot(y_trues, y_preds) # single date plot
     plot_util.fixed_single_time_plot(y_trues, y_preds) # fixed single date plot
