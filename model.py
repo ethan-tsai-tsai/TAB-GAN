@@ -172,11 +172,12 @@ class discriminator(nn.Module):
         # position encoding
         seq_len = args.window_size * (270 // args.time_step) + 1
         target_len = args.target_length // args.time_step
-        self.position_encode = nn.Parameter(torch.zeros(1, seq_len + target_len, args.hidden_dim_d))
+        
+        self.position_encoding = PositionalEncoding(args.hidden_dim_d)
         
         encoder_layer = nn.TransformerEncoderLayer(
             d_model = args.hidden_dim_d,
-            nhead = 4,
+            nhead = 8,
             dim_feedforward = args.hidden_dim_d * 4,
             dropout = 0.1
         )
@@ -188,7 +189,7 @@ class discriminator(nn.Module):
         cond_embedded = self.cond_embedding(cond)
         x_embedded = self.x_embedding(x.unsqueeze(-1))
         input = torch.cat((cond_embedded, x_embedded), dim=1)  # (batch_size, seq_len_condition + seq_len_target, d_model)
-        input = (input + self.position_encode).permute(1, 0, 2) # (seq_len, batch_size, d_model)
+        input = self.position_encoding(input).permute(1, 0, 2) # (seq_len, batch_size, d_model)
         out = self.encoder(input)
         out = out[-1, :, :]
         out = self.fc(out)

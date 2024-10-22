@@ -38,8 +38,8 @@ def objective(trial):
         # model setup
         wgan_model = wgan(train_datasets, args)
         _ = wgan_model.train(train_loader, val_loader)
-        _, _, score = wgan_model.validation(val_loader)
-        
+        _, _, kld, fid = wgan_model.validation(val_loader)
+        score = kld + fid
         return score
     except Exception as e:
         logging.error(f"Error in trial {trial.number}: {e}")
@@ -59,5 +59,5 @@ if __name__ == '__main__':
         print('    {}: {}'.format(key, value))
         print(f'--{key} {value}\\')
     
-    with open(f'./model/{args.stock}_{args.name}_args.pkl', 'wb') as f:
+    with open(f'./model/{args.stock}_{args.name}/bayes_args.pkl', 'wb') as f:
         pickle.dump(trial.params, f)

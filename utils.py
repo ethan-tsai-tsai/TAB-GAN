@@ -5,6 +5,38 @@ import seaborn as sns
 import os
 import numpy as np
 from datetime import datetime, timedelta
+from scipy.linalg import sqrtm
+
+def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
+    # 計算均值差的平方
+    diff = mu1 - mu2
+    diff_squared = np.sum(diff ** 2)
+
+    # 計算協方差矩陣的乘積的平方根
+    covmean, _ = sqrtm(sigma1.dot(sigma2), disp=False)
+
+    # 確保協方差矩陣的數值穩定性
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+
+    # 計算 FID
+    fid_value = diff_squared + np.trace(sigma1 + sigma2 - 2 * covmean)
+
+    return fid_value
+
+def calculate_statistics(data):
+    mu = np.mean(data, axis=0)
+    sigma = np.cov(data, rowvar=False)
+    return mu, sigma
+
+def fid_score(generated_data, real_data):
+    # 計算真實數據和生成數據的均值和協方差
+    mu1, sigma1 = calculate_statistics(real_data)
+    mu2, sigma2 = calculate_statistics(generated_data)
+
+    # 計算 FID
+    fid_value = calculate_frechet_distance(mu1, sigma1, mu2, sigma2)
+    return fid_value
 
 def calc_kld(generated_data, ground_truth):
     pd_gt, _ = np.histogram(ground_truth, bins='auto', density=True)
@@ -41,7 +73,7 @@ def save_loss_curve(results, args):
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig(f'./img/loss/{args.stock}_loss_{args.name}.png')
+    plt.savefig(f'./logs/{args.stock}_{args.name}/loss.png')
     
 def save_model(model_d, model_g, args, file_name):
     # filtering args

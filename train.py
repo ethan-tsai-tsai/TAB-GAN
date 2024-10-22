@@ -18,8 +18,10 @@ class wgan:
         self.BEST_KLD = np.inf
 
         # initialize folder
+        self.FOLDER_NAME = f'{args.stock}_{args.name}'
+        if not os.path.exists(f'model/{self.FOLDER_NAME}'):os.makedirs(f'model/{self.FOLDER_NAME}')
+        
         if self.args.mode=='train':
-            self.FOLDER_NAME = f'{args.stock}_{args.name}'
             if not os.path.exists(f'logs/{self.FOLDER_NAME}'):os.makedirs(f'logs/{self.FOLDER_NAME}')
             else: clear_folder(f'logs/{self.FOLDER_NAME}')
         
@@ -107,7 +109,7 @@ class wgan:
                 optimizer_g.step()
             total_loss_d += loss_d.cpu().detach().numpy()
             total_loss_g += loss_g.cpu().detach().numpy()
-            test_loss_d, test_loss_g, kld = self.validation(val_loader)
+            test_loss_d, test_loss_g, kld, fid = self.validation(val_loader)
             
             results['loss_d'].append(total_loss_d)
             results['loss_g'].append(total_loss_g)
@@ -146,13 +148,14 @@ class wgan:
                 
                 # update best model (use kld)
                 kld = calc_kld(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
+                fid = fid_score(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
                 if kld < self.BEST_KLD and kld != np.inf:
                     self.BEST_KLD = kld
                     if self.args.mode=='train': # do not print messages when choosing other mode
-                        file_name = f'./model/{self.args.stock}_{self.args.name}_best.pth'
+                        file_name = f'./model/{self.args.stock}_{self.args.name}/best.pth'
                         save_model(self.model_d, self.model_g, self.args, file_name)
                         print(f'update best model with kld = {kld}')
-        return total_loss_d, total_loss_g, kld
+        return total_loss_d, total_loss_g, kld, fid
     
     def validation_plot(self, val_datasets, file_name):
         X = torch.tensor(np.array(val_datasets.X), dtype=torch.float32)
@@ -189,8 +192,9 @@ if __name__ == '__main__':
     # set arguments
     args = parse_args()
     args.mode = 'train'
-    if os.path.exists(f'./model/{args.stock}_{args.name}_args.pkl'):
-        with open(f'./model/{args.stock}_{args.name}_args.pkl', 'rb') as f:
+    file_name = f'./model/{args.stock}_{args.name}/bayes_args.pkl'
+    if os.path.exists(file_name):
+        with open(file_name, 'rb') as f:
             saved_args = pickle.load(f)
         for key, value in saved_args.items():
             if hasattr(args, key):
@@ -220,5 +224,5 @@ if __name__ == '__main__':
     print('----------------------------------------------------------------')
     results = wgan_model.train(train_loader, val_loader)
     save_loss_curve(results, args)
-    file_name = f'./model/{args.stock}_{args.name}.pth'
+    file_name = f'./model/{args.stock}_{args.name}/final.pth'
     save_model(wgan_model.model_d, wgan_model.model_g, args, file_name)

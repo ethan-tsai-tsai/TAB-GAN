@@ -14,7 +14,7 @@ if __name__ == '__main__':
     # set arguments
     args = parse_args()
     FILE_NAME = f'{args.stock}_{args.name}'
-    check_point = torch.load(f'./model/{FILE_NAME}_best.pth')
+    check_point = torch.load(f'./model/{FILE_NAME}/final.pth')
     args.mode = 'test' # switch to test mode
     
     if os.path.exists(f'./model/{FILE_NAME}_args.pkl'):
