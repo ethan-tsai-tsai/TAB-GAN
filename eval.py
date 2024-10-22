@@ -11,11 +11,24 @@ from arguments import *
 from train import wgan
 
 if __name__ == '__main__':
+    # set arguments
     args = parse_args()
+    FILE_NAME = f'{args.stock}_{args.name}'
+    check_point = torch.load(f'./model/{FILE_NAME}_best.pth')
     args.mode = 'test' # switch to test mode
     
+    if os.path.exists(f'./model/{FILE_NAME}_args.pkl'):
+        with open(f'./model/{FILE_NAME}_args.pkl', 'rb') as f:
+            saved_args = pickle.load(f)
+        for key, value in saved_args.items():
+            if hasattr(args, key):
+                setattr(args, key, value)
+    else:
+        for key, value in check_point['args'].items(): 
+            if key not in ['pred_times', 'bound_percent']:
+                setattr(args, key, value)
+    
     # setting parameters
-    FILE_NAME = f'{args.stock}_{args.name}'
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
     target_length = args.target_length // args.time_step
     
@@ -24,11 +37,7 @@ if __name__ == '__main__':
     wgan_model = wgan(test_datasets, args)
     
     # load best model and arguments
-    check_point = torch.load(f'./model/{FILE_NAME}.pth')
     wgan_model.model_g.load_state_dict(check_point['model_g'])
-    for key, value in check_point['args'].items(): 
-        if key not in ['pred_times', 'bound_percent']:
-            setattr(args, key, value)
     
     X = torch.tensor(np.array(test_datasets.X), dtype=torch.float32)
     y = np.array(test_datasets.y)

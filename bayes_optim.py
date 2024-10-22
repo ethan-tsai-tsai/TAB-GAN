@@ -38,8 +38,8 @@ def objective(trial):
         # model setup
         wgan_model = wgan(train_datasets, args)
         _ = wgan_model.train(train_loader, val_loader)
+        _, _, score = wgan_model.validation(val_loader)
         
-        score = wgan_model.BEST_KLD
         return score
     except Exception as e:
         logging.error(f"Error in trial {trial.number}: {e}")

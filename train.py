@@ -57,8 +57,8 @@ class wgan:
     
     def train(self, train_loader, val_loader):
         # trainin set
-        optimizer_d = torch.optim.AdamW(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
-        optimizer_g = torch.optim.AdamW(self.model_g.parameters(), lr=self.args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
+        optimizer_d = torch.optim.Adam(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
+        optimizer_g = torch.optim.Adam(self.model_g.parameters(), lr=self.args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
         loss_fn = nn.L1Loss()
         results = {'loss_d': [], 'loss_g': [], 'test_loss_d': [], 'test_loss_g': [], 'test_kld': []}
         
@@ -116,7 +116,7 @@ class wgan:
             results['test_kld'].append(kld)
             
             if (epoch+1)%(self.args.epoch//10)==0:
-                self.validation_plot(val_datasets, f'Epoch{epoch + 1}_chart')
+                if self.args.mode == 'train': self.validation_plot(val_datasets, f'Epoch{epoch + 1}_chart')
                 # print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_g: {mae_loss}')
                 print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
                 
@@ -186,8 +186,16 @@ class wgan:
         return y_preds, y_trues
 
 if __name__ == '__main__':
+    # set arguments
     args = parse_args()
     args.mode = 'train'
+    if os.path.exists(f'./model/{args.stock}_{args.name}_args.pkl'):
+        with open(f'./model/{args.stock}_{args.name}_args.pkl', 'rb') as f:
+            saved_args = pickle.load(f)
+        for key, value in saved_args.items():
+            if hasattr(args, key):
+                setattr(args, key, value)
+    
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
     train_size = int(0.95 * len(train_datasets))
     val_size = len(train_datasets) - train_size
