@@ -15,11 +15,11 @@ def objective(trial):
         args.noise_dim = trial.suggest_categorical('noise_dim', [32, 64, 128])
         # model
         args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [32, 64, 128])
-        args.num_layers_g = trial.suggest_categorical('num_layers_g', [1, 2, 3])
-        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [16, 32, 64])
-        args.num_layers_d = trial.suggest_categorical('num_layers_d', [2, 4])
+        args.num_layers_g = trial.suggest_int('num_layers_g', 1, 3)
+        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [16, 32, 64, 128])
+        args.num_layers_d = trial.suggest_int('num_layers_d', 1, 4)
         # train
-        args.epoch  = trial.suggest_int('epoch', 10, 150)
+        args.epoch  = trial.suggest_int('epoch', 100, 300)
         args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-4, log=True)
         args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-4, log=True)
         args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])
@@ -28,7 +28,7 @@ def objective(trial):
         
         # prepare dataset
         train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
-        train_size = int(0.9 * len(train_datasets))
+        train_size = int(0.95 * len(train_datasets))
         val_size = len(train_datasets) - train_size
         train_data, val_data = random_split(train_datasets, [train_size, val_size])
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)

@@ -34,7 +34,7 @@ class DataProcessor:
         self.data['ts'] = pd.to_datetime(self.data['ts'])
         self.data.set_index(self.data['ts'], inplace=True)
         self.data = self.data.groupby(self.data.index).mean() # 重複日期
-        # self.data = self.data[self.data.index > '2021-01-01']
+        self.data = self.data[self.data.index > '2021-01-01']
         
          # 補全缺失值
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期

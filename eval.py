@@ -32,7 +32,7 @@ if __name__ == '__main__':
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
     target_length = args.target_length // args.time_step
     
-    test_datasets = StockDataset(args, f'./data/{args.stock}/test2.csv')
+    test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     time_interval = test_datasets.time_intervals[args.window_size + 1:]
     wgan_model = wgan(test_datasets, args)
     

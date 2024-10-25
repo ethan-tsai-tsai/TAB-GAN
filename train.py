@@ -206,7 +206,7 @@ if __name__ == '__main__':
     train_data, val_data = random_split(train_datasets, [train_size, val_size])
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
     val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
-    val_datasets = StockDataset(args, f'./data/{args.stock}/test2.csv')
+    val_datasets = StockDataset(args, f'./data/{args.stock}/val.csv')
     wgan_model = wgan(train_datasets, args)
     plot_util = plot_predicions(f'./logs/{args.stock}_{args.name}', args, val_datasets.time_intervals)
     
