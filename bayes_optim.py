@@ -28,17 +28,19 @@ def objective(trial):
         
         # prepare dataset
         train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
+        test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
         train_size = int(0.95 * len(train_datasets))
         val_size = len(train_datasets) - train_size
         train_data, val_data = random_split(train_datasets, [train_size, val_size])
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
         val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
+        test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
         
         print(f'Starting trial with params: {trial.params}')
         # model setup
         wgan_model = wgan(train_datasets, args)
         _ = wgan_model.train(train_loader, val_loader)
-        _, _, kld, fid = wgan_model.validation(val_loader)
+        _, _, kld, fid = wgan_model.validation(test_loader)
         score = kld + fid
         return score
     except Exception as e:
@@ -59,5 +61,5 @@ if __name__ == '__main__':
         print('    {}: {}'.format(key, value))
         print(f'--{key} {value}\\')
     
-    with open(f'./model/{args.stock}_{args.name}/bayes_args.pkl', 'wb') as f:
+    with open(f'./model/{args.stock}_{args.name}/.pkl', 'wb') as f:
         pickle.dump(trial.params, f)

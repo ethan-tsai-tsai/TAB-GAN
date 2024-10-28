@@ -11,7 +11,7 @@ nohup python -u bayes_optim.py --stock 2330 --cuda 7 > ./out/optim_2330.out 2>&1
 nohup python -u bayes_optim.py --stock 2610 --cuda 4 > ./out/optim_2610.out 2>&1 &
 
 # evaluation
-python -u eval.py --stock 0050 --cuda 4
-python -u eval.py --stock 1101 --cuda 5
-python -u eval.py --stock 2330 --cuda 6
-python -u eval.py --stock 2610 --cuda 7
+python -u eval.py --stock 0050 --cuda 4 &
+python -u eval.py --stock 1101 --cuda 5 &
+python -u eval.py --stock 2330 --cuda 6 &
+python -u eval.py --stock 2610 --cuda 7 &

@@ -153,7 +153,7 @@ class plot_predicions:
         plt.close()
     
     def band_plot(self, y_true, y_pred):
-        palette = sns.color_palette('pastel', len(self.time_interval) * self.seq_len)
+        palette = sns.color_palette('pastel', len(self.time_interval) * self.seq_len * self.seq_len)
         
         plt.figure(figsize=(10, 5))
         for i, (y, y_hat) in enumerate(zip(y_true, y_pred)):
@@ -161,7 +161,7 @@ class plot_predicions:
             upper_bound, lower_bound = self._get_bound(y_hat)
             # set values
             y_hat = np.array(y_hat).flatten()
-            x_val = np.arange(i, i + self.seq_len)
+            x_val = np.arange(i, i + self.target_len)
             # ploting
             sns.lineplot(x=x_val, y=y, color='black')
             sns.scatterplot(x=x_val.repeat(self.args.pred_times), y=y_hat, alpha=0.4, color=palette[i])
@@ -305,7 +305,7 @@ class plot_predicions:
         plt.figure(figsize=(10, 5))
         for i, (y, y_hat) in enumerate(zip(y_true, y_pred)):
             # set values
-            x_val = np.arange(i, i + self.seq_len)
+            x_val = np.arange(i, i + self.target_len)
             y, y_hat = np.array(y), np.array(y_hat).flatten()
             # ploting
             sns.lineplot(x=x_val, y=y, color='black')
@@ -351,10 +351,10 @@ class plot_predicions:
     def _arrange_list_dist_fixed(self, list):
         out = []
         for i, item in enumerate(list):
-            if i % self.seq_len == 0: out.append(item)
+            if i % self.target_len == 0: out.append(item)
             else:
-                head = np.array(item[-(i % self.seq_len):])
-                tail = np.array(item[:-(i % self.seq_len)])
+                head = np.array(item[-(i % self.target_len):])
+                tail = np.array(item[:-(i % self.target_len)])
                 out.append(np.concatenate((head, tail), axis=0))
         return np.array(out)
     

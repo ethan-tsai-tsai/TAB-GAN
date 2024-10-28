@@ -41,10 +41,10 @@ class DataProcessor:
         self._complete_data() 
         
          # 加入欄位
-        ## Technical Indicators
-        self.data['cmf'] = self._cmf()
-        self.data['colose_ratio'] = self._close_ratio(window=self.time_step)
-        self.data['volume_percentile'] = self._volume_percentile(window=self.time_step)
+        # Technical Indicators
+        # self.data['cmf'] = self._cmf()
+        # self.data['colose_ratio'] = self._close_ratio(window=self.time_step)
+        # self.data['volume_percentile'] = self._volume_percentile(window=self.time_step)
         
         # 切割掉第一天（技術指標大多沒有值）
         self.data = self.data.iloc[270::, :]
@@ -71,11 +71,13 @@ class DataProcessor:
         assert not np.isinf(self.data.values).any(), 'There are inf values in the data.'
 
         # split and save dataframe
-        test_dataframe = self.data.iloc[-(270//self.args.time_step) * 10:, :]
-        train_dataframe = self.data.iloc[:-(270//self.args.time_step) * 10, :]
+        test_dataframe = self.data.iloc[-(270//self.args.time_step) * 30:, :]
+        train_dataframe = self.data.iloc[:-(270//self.args.time_step) * 30, :]
+        val_dataframe = self.data[(self.data.index.month==8) & (self.data.index.year==2024)]
 
         train_dataframe.to_csv(f'{path}/train.csv')
         test_dataframe.to_csv(f'{path}/test.csv')
+        val_dataframe.to_csv(f'{path}/val.csv')
 
         end_time = datetime.now()
         print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
