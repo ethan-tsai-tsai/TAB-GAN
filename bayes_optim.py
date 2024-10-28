@@ -69,4 +69,4 @@ if __name__ == '__main__':
         
     end_time = datetime.now()
     optim_time = (end_time - start_time).seconds
-    print(f'optimization time: {optim_time//3600} : {(optim_time%3600)//60} : {optim_time%60}')
+    print(f'optimization time: {optim_time//3600}:{(optim_time%3600)//60}:{optim_time%60}')
