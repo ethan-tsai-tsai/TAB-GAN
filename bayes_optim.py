@@ -50,6 +50,9 @@ def objective(trial):
     
 
 if __name__ == '__main__':
+    
+    start_time = datetime.now()
+    
     args = parse_args()
     study = optuna.create_study(direction='minimize')
     study.optimize(objective, n_trials=10)
@@ -63,3 +66,7 @@ if __name__ == '__main__':
     
     with open(f'./model/{args.stock}_{args.name}/.pkl', 'wb') as f:
         pickle.dump(trial.params, f)
+        
+    end_time = datetime.now()
+    optim_time = (end_time - start_time).seconds
+    print(f'optimization time: {optim_time//3600} : {(optim_time%3600)//60} : {optim_time%60}')

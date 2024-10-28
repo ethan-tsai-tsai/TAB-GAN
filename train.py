@@ -189,6 +189,9 @@ class wgan:
         return y_preds, y_trues
 
 if __name__ == '__main__':
+    
+    start_time = datetime.now()
+    
     # set arguments
     args = parse_args()
     args.mode = 'train'
@@ -226,3 +229,7 @@ if __name__ == '__main__':
     save_loss_curve(results, args)
     file_name = f'./model/{args.stock}_{args.name}/final.pth'
     save_model(wgan_model.model_d, wgan_model.model_g, args, file_name)
+    
+    end_time = datetime.now()
+    training_time = (end_time - start_time).seconds
+    print(f'Training time: {training_time//3600} : {(training_time%3600)//60} : {training_time%60}')
