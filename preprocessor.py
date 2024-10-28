@@ -34,11 +34,11 @@ class DataProcessor:
         self.data['ts'] = pd.to_datetime(self.data['ts'])
         self.data.set_index(self.data['ts'], inplace=True)
         self.data = self.data.groupby(self.data.index).mean() # 重複日期
-        self.data = self.data[self.data.index > '2021-01-01']
         
          # 補全缺失值
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
         self._complete_data() 
+        self.data = self.data[self.data.index > '2021-01-01']
         
          # 加入欄位
         # Technical Indicators
@@ -71,8 +71,8 @@ class DataProcessor:
         assert not np.isinf(self.data.values).any(), 'There are inf values in the data.'
 
         # split and save dataframe
-        test_dataframe = self.data.iloc[-(270//self.args.time_step) * 30:, :]
-        train_dataframe = self.data.iloc[:-(270//self.args.time_step) * 30, :]
+        test_dataframe = self.data.iloc[-(270//self.args.time_step) * 5:, :]
+        train_dataframe = self.data.iloc[:-(270//self.args.time_step) * 5, :]
         val_dataframe = self.data[(self.data.index.month==8) & (self.data.index.year==2024)]
 
         train_dataframe.to_csv(f'{path}/train.csv')
@@ -113,16 +113,17 @@ class DataProcessor:
         return volume_percentile
     
     def _price_change(self, data):
-        changes = [0]  # 第一天沒有變化，設為 0
+        changes = [0]
         for i in range(1, len(data)):
-            if data[i - 1] == 0:  # 檢查前一天的價格是否為零
-                changes.append(0)  # 如果為零，無法計算變化，設為 0 或其他值
+            if data[i - 1] == 0:
+                changes.append(0)
             else:
                 change = (data[i] - data[i - 1]) / data[i - 1] * 100
                 changes.append(change)
         return changes   
  
     def _complete_data(self):
+        # reset index
         new_idx = []
         for date in self.time_intervals:
             start_time = pd.to_datetime(date + ' 09:01:00')
@@ -131,26 +132,13 @@ class DataProcessor:
             new_idx += datetime_range
         self.data = self.data.reindex(new_idx)
         
-        # 計算填補值
-        self.data['MA_Open'] = self.data['Open'].rolling(window=5, min_periods=1).mean()
-        self.data['MA_High'] = self.data['High'].rolling(window=5, min_periods=1).mean()
-        self.data['MA_Low'] = self.data['Low'].rolling(window=5, min_periods=1).mean()
-        self.data['MA_Close'] = self.data['Close'].rolling(window=5, min_periods=1).mean()
-        self.data['MA_Volume'] = self.data['Volume'].rolling(window=5, min_periods=1).mean()
-        self.data['MA_Amount'] = self.data['Amount'].rolling(window=5, min_periods=1).mean()
-
-        # 填補遺失值
-        self.data['Open'] = self.data['Open'].fillna(self.data['MA_Open'])
-        self.data['High'] = self.data['High'].fillna(self.data['MA_High'])
-        self.data['Low'] = self.data['Low'].fillna(self.data['MA_Low'])
-        self.data['Close'] = self.data['Close'].fillna(self.data['MA_Close'])
-        self.data['Volume'] = self.data['Volume'].fillna(self.data['MA_Volume'])
-        self.data['Amount'] = self.data['Amount'].fillna(self.data['MA_Amount'])
-        self.data = self.data.drop(['MA_Open', 'MA_High', 'MA_Low', 'MA_Close', 'MA_Volume', 'MA_Amount'], axis=1)
-        # 遞迴
-        if self.data.isnull().values.any():
-            # print(f'Data still has {self.data.isnull().sum().sum()} missing value, try again complete data.')
-            self._complete_data()    
+        # fill missing values
+        self.data['Open'] = self.data['Open'].fillna(method='ffill').interpolate(method='linear')
+        self.data['High'] = self.data['High'].fillna(method='ffill').interpolate(method='linear')
+        self.data['Low'] = self.data['Low'].fillna(method='ffill').interpolate(method='linear')
+        self.data['Close'] = self.data['Close'].fillna(method='ffill').interpolate(method='linear')
+        self.data['Volume'] = self.data['Volume'].fillna(method='ffill').interpolate(method='linear')
+        self.data['Amount'] = self.data['Amount'].fillna(method='ffill').interpolate(method='linear')
 
 class StockDataset(Dataset):
     def __init__(self, args, csv_file):
