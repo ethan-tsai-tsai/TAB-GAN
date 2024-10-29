@@ -184,7 +184,7 @@ class wgan:
                 y_pred = scaler_y.inverse_transform(y_pred) # inverse transform
                 y_pred = np.expand_dims(y_pred, axis=2)
                 y_preds = y_pred if y_preds.size==0 else np.concatenate((y_preds, y_pred), axis=2)
-            
+                
             y_trues = scaler_y.inverse_transform(y) # inverse transform
         return y_preds, y_trues
 

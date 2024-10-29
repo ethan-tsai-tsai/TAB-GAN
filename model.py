@@ -68,7 +68,7 @@ class generator(nn.Module):
         
     def _weights_init(self, m):
         if isinstance(m, nn.Linear):
-            nn.init.xavier_normal_(m.weight)
+            nn.init.normal_(m.weight, mean=0, std=0.01)  # 使用正態分佈初始化
             nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LSTM):
             for name, param in m.named_parameters():

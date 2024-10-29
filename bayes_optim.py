@@ -16,14 +16,14 @@ def objective(trial):
         # model
         args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [32, 64, 128])
         args.num_layers_g = trial.suggest_int('num_layers_g', 1, 3)
-        args.num_head_g = trial.suggest_categorical('num_head_g', [8, 16, 32])
+        args.num_head_g = trial.suggest_categorical('num_head_g', [4, 8, 16])
         args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [16, 32, 64, 128])
         args.num_layers_d = trial.suggest_int('num_layers_d', 1, 4)
-        args.num_head_d = trial.suggest_categorical('num_head_d', [8, 16, 32])
+        args.num_head_d = trial.suggest_categorical('num_head_d', [4, 8, 16])
         # train
-        args.epoch  = trial.suggest_int('epoch', 30, 100)
-        args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-4, log=True)
-        args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-4, log=True)
+        args.epoch  = trial.suggest_int('epoch', 50, 200)
+        args.lr_d = trial.suggest_float('lr_d', 1e-7, 1e-5, log=True)
+        args.lr_g = trial.suggest_float('lr_g', 1e-7, 1e-5, log=True)
         args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])
         args.d_iter = trial.suggest_int('d_iter', 2, 5)
         args.gp_lambda = trial.suggest_int('gp_lambda', 6, 10)
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     for key, value in trial.params.items():
         print('    {}: {}'.format(key, value))
     
-    with open(f'./model/{args.stock}_{args.name}/.pkl', 'wb') as f:
+    with open(f'./model/{args.stock}_{args.name}/bayes_args.pkl', 'wb') as f:
         pickle.dump(trial.params, f)
         
     end_time = datetime.now()

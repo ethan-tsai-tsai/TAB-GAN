@@ -33,7 +33,7 @@ if __name__ == '__main__':
     target_length = args.target_length // args.time_step
     
     test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
-    time_interval = test_datasets.time_intervals[args.window_size + 1:]
+    time_interval = test_datasets.time_intervals[args.window_size:]
     wgan_model = wgan(test_datasets, args)
     
     # load best model and arguments
@@ -41,6 +41,8 @@ if __name__ == '__main__':
     
     X = torch.tensor(np.array(test_datasets.X), dtype=torch.float32)
     y = np.array(test_datasets.y)
+    y[y == -10] = np.nan
+    print(y[-1])
     plot_util = plot_predicions(path=f'./img/{FILE_NAME}', args=args, time_interval=time_interval)
     print('------------------------------------------------------------------------------------------------')
     print(f'Evaluating model: {args.name}')

@@ -351,7 +351,7 @@ class plot_predicions:
     def _arrange_list_dist_fixed(self, list):
         out = []
         for i, item in enumerate(list):
-            if i % self.target_len == 0: out.append(item)
+            if i % self.seq_len == 0: out.append(item)
             else:
                 head = np.array(item[-(i % self.target_len):])
                 tail = np.array(item[:-(i % self.target_len)])
