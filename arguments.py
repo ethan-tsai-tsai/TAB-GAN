@@ -14,8 +14,10 @@ def parse_args():
     # Model
     parser.add_argument('--hidden_dim_g', type=int, default=128, help='generator each hidden layer dimension')
     parser.add_argument('--num_layers_g', type=int, default=1, help='generator hidden layer number')
+    parser.add_argument('--num_head_g', type=int, default=8, help='self attention head')
     parser.add_argument('--hidden_dim_d', type=int, default=64, help='discriminator each hidden layer dimension')
     parser.add_argument('--num_layers_d', type=int, default=3, help='discriminator hidden layer number')
+    parser.add_argument('--num_head_d', type=int, default=8, help='self attention head')
     
     # Train
     parser.add_argument('--lr_g', type=float, default=0.00005, help='generator learning rate')

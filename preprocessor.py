@@ -71,7 +71,7 @@ class DataProcessor:
         assert not np.isinf(self.data.values).any(), 'There are inf values in the data.'
 
         # split and save dataframe
-        test_dataframe = self.data.iloc[-(270//self.args.time_step) * 5:, :]
+        test_dataframe = self.data.iloc[-(270//self.args.time_step) * 8:, :]
         train_dataframe = self.data.iloc[:-(270//self.args.time_step) * 5, :]
         val_dataframe = self.data[(self.data.index.month==8) & (self.data.index.year==2024)]
 

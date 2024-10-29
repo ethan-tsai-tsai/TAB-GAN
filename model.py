@@ -46,7 +46,7 @@ class generator(nn.Module):
         
         encoder_layers = nn.TransformerEncoderLayer(
             d_model=self.hidden_layer_size[-1] * 2,
-            nhead=8,
+            nhead=args.num_head_g,
             dim_feedforward=self.hidden_layer_size[-1] * 4,
             dropout=0.1,
             activation='relu'
@@ -58,11 +58,26 @@ class generator(nn.Module):
         )
         
         self.fc = nn.Sequential(
-            nn.Linear(self.hidden_layer_size[-1] * 2+noise_size, self.hidden_layer_size[-1] * 2),
-            nn.BatchNorm1d(self.hidden_layer_size[-1] * 2),
+            nn.Linear(self.hidden_layer_size[-1] * 2 + noise_size, self.hidden_layer_size[-1] * 2),
+            nn.LayerNorm(self.hidden_layer_size[-1] * 2),
             nn.LeakyReLU(),
             nn.Linear(self.hidden_layer_size[-1] * 2, output_size),
         )
+
+        self.apply(self._weights_init)
+        
+    def _weights_init(self, m):
+        if isinstance(m, nn.Linear):
+            nn.init.xavier_normal_(m.weight)
+            nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LSTM):
+            for name, param in m.named_parameters():
+                if 'weight_ih' in name:
+                    nn.init.xavier_normal_(param.data)
+                elif 'weight_hh' in name:
+                    nn.init.orthogonal_(param.data)
+                elif 'bias' in name:
+                    nn.init.constant_(param.data, 0)
     
     def forward(self, cond, noise):
         for i in range(len(self.lstm_list)):
@@ -98,7 +113,7 @@ class discriminator(nn.Module):
         
         encoder_layer = nn.TransformerEncoderLayer(
             d_model = args.hidden_dim_d,
-            nhead = 8,
+            nhead = args.num_head_d,
             dim_feedforward = args.hidden_dim_d * 4,
             dropout = 0.1
         )

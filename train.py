@@ -196,12 +196,12 @@ if __name__ == '__main__':
     args = parse_args()
     args.mode = 'train'
     file_name = f'./model/{args.stock}_{args.name}/bayes_args.pkl'
-    # if os.path.exists(file_name):
-    #     with open(file_name, 'rb') as f:
-    #         saved_args = pickle.load(f)
-    #     for key, value in saved_args.items():
-    #         if hasattr(args, key):
-    #             setattr(args, key, value)
+    if os.path.exists(file_name):
+        with open(file_name, 'rb') as f:
+            saved_args = pickle.load(f)
+        for key, value in saved_args.items():
+            if hasattr(args, key):
+                setattr(args, key, value)
     
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
     train_size = int(0.95 * len(train_datasets))
