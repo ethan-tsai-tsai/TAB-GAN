@@ -1,33 +1,14 @@
 import math
 import torch
 from torch import nn
-from torch.nn.utils import spectral_norm
-
-class FiLM(nn.Module):
-    def __init__(self, cond_dim, feature_dim):
-        super(FiLM, self).__init__()
-        # 用於生成scale和shift參數的線性層
-        self.scale_layer = nn.Linear(cond_dim, feature_dim)
-        self.shift_layer = nn.Linear(cond_dim, feature_dim)
-
-    def forward(self, features, cond):
-        # 計算scale和shift
-        scale = self.scale_layer(cond).unsqueeze(1)  # (batch_size, 1, feature_dim)
-        shift = self.shift_layer(cond).unsqueeze(1)  # (batch_size, 1, feature_dim)
-        # 使用FiLM公式進行調制
-        return scale * features + shift
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=500):
         super(PositionalEncoding, self).__init__()
-        # 使用nn.Parameter來創建可訓練的學習型位置編碼
         self.positional_encoding = nn.Parameter(torch.zeros(1, max_len, d_model))
-        # 初始化位置編碼，可以使用正態分佈或均勻分佈來隨機初始化
         nn.init.normal_(self.positional_encoding, mean=0, std=0.02)
 
     def forward(self, x):
-        # x的尺寸是 (batch_size, seq_len, d_model)
-        # 根據輸入序列長度選擇對應的位置編碼部分
         x = x + self.positional_encoding[:, :x.size(1), :]
         return x
     
@@ -63,21 +44,6 @@ class generator(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(self.hidden_layer_size[-1] * 2, output_size),
         )
-
-        self.apply(self._weights_init)
-        
-    def _weights_init(self, m):
-        if isinstance(m, nn.Linear):
-            nn.init.normal_(m.weight, mean=0, std=0.01)  # 使用正態分佈初始化
-            nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LSTM):
-            for name, param in m.named_parameters():
-                if 'weight_ih' in name:
-                    nn.init.xavier_normal_(param.data)
-                elif 'weight_hh' in name:
-                    nn.init.orthogonal_(param.data)
-                elif 'bias' in name:
-                    nn.init.constant_(param.data, 0)
     
     def forward(self, cond, noise):
         for i in range(len(self.lstm_list)):
@@ -101,12 +67,9 @@ class discriminator(nn.Module):
         self._args = args
         self.device = device
         
-        # Spectral Normalization
-        self.cond_embedding = spectral_norm(nn.Linear(cond_dim, args.hidden_dim_d))
-        self.x_embedding = spectral_norm(nn.Linear(1, args.hidden_dim_d))
-        
-        # FiLM
-        self.film = FiLM(cond_dim, args.hidden_dim_d)
+        # condition embedding and target embedding
+        self.cond_embedding = nn.Linear(cond_dim, args.hidden_dim_d)
+        self.x_embedding = nn.Linear(1, args.hidden_dim_d)
         
         # position encoding
         self.position_encoding = PositionalEncoding(args.hidden_dim_d)
@@ -115,21 +78,11 @@ class discriminator(nn.Module):
             d_model = args.hidden_dim_d,
             nhead = args.num_head_d,
             dim_feedforward = args.hidden_dim_d * 4,
-            dropout = 0.1
+            dropout = 0.2
         )
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=args.num_layers_d)
         
-        self.fc = spectral_norm(nn.Linear(args.hidden_dim_d, 1))
-        self._init_weights()
-        
-    def _init_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.kaiming_uniform_(m.weight, a=math.sqrt(5))  # 使用 He 初始化
-                if m.bias is not None:
-                    fan_in, _ = nn.init._calculate_fan_in_and_fan_out(m.weight)
-                    bound = 1 / math.sqrt(fan_in)
-                    nn.init.uniform_(m.bias, -bound, bound)
+        self.fc = nn.Linear(args.hidden_dim_d, 1)
     
     def forward(self, cond, x):
         cond_embedded = self.cond_embedding(cond)

@@ -90,15 +90,15 @@ class wgan:
                 optimizer_g.step()
                 
                 # train discriminator
-                for _ in range(self.args.d_iter):
-                    noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                    fake_data = self.model_g(X, noise)
-                    assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
-                    gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
-                    loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
-                    optimizer_d.zero_grad()
-                    loss_d.backward()
-                    optimizer_d.step()
+                # for _ in range(self.args.d_iter):
+                #     noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
+                #     fake_data = self.model_g(X, noise)
+                #     assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
+                #     gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
+                #     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
+                #     optimizer_d.zero_grad()
+                #     loss_d.backward()
+                #     optimizer_d.step()
                 
                 # train generator (minimize mae loss)
                 noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
@@ -160,7 +160,7 @@ class wgan:
     def validation_plot(self, val_datasets, file_name):
         X = torch.tensor(np.array(val_datasets.X), dtype=torch.float32)
         y = np.array(val_datasets.y)
-        
+        y[y == -10] = np.nan
         tmp = self.args.pred_times
         self.args.pred_times = 1
         y_pred, y_true = self.predict(X, y)
@@ -195,13 +195,13 @@ if __name__ == '__main__':
     # set arguments
     args = parse_args()
     args.mode = 'train'
-    file_name = f'./model/{args.stock}_{args.name}/bayes_args.pkl'
-    if os.path.exists(file_name):
-        with open(file_name, 'rb') as f:
-            saved_args = pickle.load(f)
-        for key, value in saved_args.items():
-            if hasattr(args, key):
-                setattr(args, key, value)
+    # file_name = f'./model/{args.stock}_{args.name}/bayes_args.pkl'
+    # if os.path.exists(file_name):
+    #     with open(file_name, 'rb') as f:
+    #         saved_args = pickle.load(f)
+    #     for key, value in saved_args.items():
+    #         if hasattr(args, key):
+    #             setattr(args, key, value)
     
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
     train_size = int(0.95 * len(train_datasets))
@@ -219,8 +219,8 @@ if __name__ == '__main__':
     print('hyperparameters: ')
     filter_val = ['noise_dim', 
                   'epoch', 'batch_size', 
-                  'hidden_dim_g', 'num_layers_g', 'lr_g',
-                  'hidden_dim_d', 'num_layers_d', 'lr_d',
+                  'hidden_dim_g', 'num_layers_g', 'num_head_g', 'lr_g',
+                  'hidden_dim_d', 'num_layers_d', 'num_head_d', 'lr_d',
                   'd_iter', 'gp_lambda']
     for k, v in vars(args).items():
         if k in filter_val: print("{}:\t{}".format(k, v))
