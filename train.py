@@ -204,7 +204,8 @@ if __name__ == '__main__':
         for key, value in saved_args.items():
             if hasattr(args, key):
                 setattr(args, key, value)
-    
+    args.lr_g *= 100
+    args.lr_d *= 100
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
     train_size = int(0.95 * len(train_datasets))
     val_size = len(train_datasets) - train_size

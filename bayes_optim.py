@@ -22,8 +22,8 @@ def objective(trial):
         args.num_head_d = trial.suggest_categorical('num_head_d', [4, 8, 16])
         # train
         args.epoch  = trial.suggest_int('epoch', 50, 200)
-        args.lr_d = trial.suggest_float('lr_d', 1e-8, 1e-7, log=True)
-        args.lr_g = trial.suggest_float('lr_g', 1e-8, 1e-7, log=True)
+        args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-5, log=True)
+        args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-5, log=True)
         args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512, 1024])
         args.d_iter = trial.suggest_int('d_iter', 2, 5)
         args.gp_lambda = trial.suggest_int('gp_lambda', 6, 15)
