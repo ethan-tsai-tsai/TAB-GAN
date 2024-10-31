@@ -12,21 +12,21 @@ def objective(trial):
         # set hyperparameters
         args.mode = 'optim' # optim mode
         # data
-        args.noise_dim = trial.suggest_categorical('noise_dim', [32, 64, 128])
+        args.noise_dim = trial.suggest_categorical('noise_dim', [32, 64, 128, 256])
         # model
-        args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [32, 64, 128, 256])
-        args.num_layers_g = trial.suggest_int('num_layers_g', 1, 3)
+        args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [32, 64, 128])
+        args.num_layers_g = trial.suggest_int('num_layers_g', 1, 4)
         args.num_head_g = trial.suggest_categorical('num_head_g', [4, 8, 16])
-        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [16, 32, 64, 128, 256])
+        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [16, 32, 64, 128])
         args.num_layers_d = trial.suggest_int('num_layers_d', 1, 4)
         args.num_head_d = trial.suggest_categorical('num_head_d', [4, 8, 16])
         # train
         args.epoch  = trial.suggest_int('epoch', 50, 200)
-        args.lr_d = trial.suggest_float('lr_d', 1e-7, 1e-6, log=True)
-        args.lr_g = trial.suggest_float('lr_g', 1e-7, 1e-6, log=True)
-        args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])
+        args.lr_d = trial.suggest_float('lr_d', 1e-8, 1e-7, log=True)
+        args.lr_g = trial.suggest_float('lr_g', 1e-8, 1e-7, log=True)
+        args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512, 1024])
         args.d_iter = trial.suggest_int('d_iter', 2, 5)
-        args.gp_lambda = trial.suggest_int('gp_lambda', 6, 10)
+        args.gp_lambda = trial.suggest_int('gp_lambda', 6, 15)
         
         # prepare dataset
         train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
@@ -42,8 +42,12 @@ def objective(trial):
         # model setup
         wgan_model = wgan(train_datasets, args)
         _ = wgan_model.train(train_loader, val_loader)
-        _, _, kld, fid = wgan_model.validation(test_loader)
-        score = kld + fid
+        _, _, test_kld, test_fid = wgan_model.validation(test_loader)
+        _, _, val_kld, val_fid = wgan_model.validation(val_loader)
+        test_score = test_kld + test_fid
+        val_score = val_kld + val_fid
+        alpha = 0.3
+        score = alpha * test_score + (1 - alpha) * val_score
         return score
     except Exception as e:
         logging.error(f"Error in trial {trial.number}: {e}")

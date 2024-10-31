@@ -35,7 +35,7 @@ class generator(nn.Module):
         
         self.transformer_encoder = nn.TransformerEncoder(
             encoder_layers, 
-            num_layers=2
+            num_layers=1
         )
         
         self.fc = nn.Sequential(
@@ -44,6 +44,19 @@ class generator(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(self.hidden_layer_size[-1] * 2, output_size),
         )
+        self.apply(self.init_weights)
+    
+    def init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+        elif isinstance(m, nn.LSTM):
+            for name, param in m.named_parameters():
+                if 'weight' in name:
+                    nn.init.xavier_uniform_(param)
+                elif 'bias' in name:
+                    nn.init.zeros_(param)
     
     def forward(self, cond, noise):
         for i in range(len(self.lstm_list)):
@@ -83,6 +96,25 @@ class discriminator(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer, num_layers=args.num_layers_d)
         
         self.fc = nn.Linear(args.hidden_dim_d, 1)
+        self.apply(self._init_weights)
+    
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            # Xavier初始化線性層
+            nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+        elif isinstance(m, nn.TransformerEncoderLayer):
+            # Transformer的自注意力和前饋層
+            for name, param in m.named_parameters():
+                if 'in_proj_weight' in name:  # 自注意力權重
+                    nn.init.xavier_uniform_(param)
+                elif 'fc1.weight' in name:  # 前饋層的第一層
+                    nn.init.kaiming_uniform_(param, nonlinearity='relu')
+                elif 'fc2.weight' in name:  # 前饋層的第二層
+                    nn.init.xavier_uniform_(param)
+                elif 'bias' in name:
+                    nn.init.zeros_(param)
     
     def forward(self, cond, x):
         cond_embedded = self.cond_embedding(cond)

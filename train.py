@@ -59,8 +59,8 @@ class wgan:
     
     def train(self, train_loader, val_loader):
         # trainin set
-        optimizer_d = torch.optim.Adam(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
-        optimizer_g = torch.optim.Adam(self.model_g.parameters(), lr=self.args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
+        optimizer_d = torch.optim.AdamW(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
+        optimizer_g = torch.optim.AdamW(self.model_g.parameters(), lr=self.args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
         loss_fn = nn.L1Loss()
         results = {'loss_d': [], 'loss_g': [], 'test_loss_d': [], 'test_loss_g': [], 'test_kld': []}
         
@@ -79,6 +79,7 @@ class wgan:
                     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
                     optimizer_d.zero_grad()
                     loss_d.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
                     optimizer_d.step()
                 
                 # train generator (minimize wgan loss)
@@ -87,6 +88,7 @@ class wgan:
                 loss_g = self.generator_loss(X, fake_data)
                 optimizer_g.zero_grad()
                 loss_g.backward()
+                torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
                 optimizer_g.step()
                 
                 # train discriminator
@@ -181,11 +183,11 @@ class wgan:
             for _ in range(self.args.pred_times):
                 noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
                 y_pred = self.model_g(X, noise).cpu().detach().numpy()
-                y_pred = scaler_y.inverse_transform(y_pred) # inverse transform
+                y_pred = scaler_y.inverse_transform(y_pred) 
                 y_pred = np.expand_dims(y_pred, axis=2)
                 y_preds = y_pred if y_preds.size==0 else np.concatenate((y_preds, y_pred), axis=2)
                 
-            y_trues = scaler_y.inverse_transform(y) # inverse transform
+            y_trues = scaler_y.inverse_transform(y)
         return y_preds, y_trues
 
 if __name__ == '__main__':
@@ -195,13 +197,13 @@ if __name__ == '__main__':
     # set arguments
     args = parse_args()
     args.mode = 'train'
-    # file_name = f'./model/{args.stock}_{args.name}/bayes_args.pkl'
-    # if os.path.exists(file_name):
-    #     with open(file_name, 'rb') as f:
-    #         saved_args = pickle.load(f)
-    #     for key, value in saved_args.items():
-    #         if hasattr(args, key):
-    #             setattr(args, key, value)
+    file_name = f'./model/{args.stock}_{args.name}/bayes_args.pkl'
+    if os.path.exists(file_name):
+        with open(file_name, 'rb') as f:
+            saved_args = pickle.load(f)
+        for key, value in saved_args.items():
+            if hasattr(args, key):
+                setattr(args, key, value)
     
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
     train_size = int(0.95 * len(train_datasets))

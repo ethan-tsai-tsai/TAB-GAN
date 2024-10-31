@@ -38,7 +38,7 @@ class DataProcessor:
          # 補全缺失值
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
         self._complete_data() 
-        self.data = self.data[self.data.index > '2021-01-01']
+        self.data = self.data[self.data.index > '2022-01-01']
         
          # 加入欄位
         # Technical Indicators
@@ -163,7 +163,7 @@ class StockDataset(Dataset):
         self._rolling_window()
     
     def _standardize(self):
-        col_list = list(self.data.columns)[:6]
+        col_list = list(self.data.columns)[:11]
         if self._args.mode in ['train', 'optim']:
             # scaler_X = StandardScaler()
             # scaler_y = StandardScaler()
