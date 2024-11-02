@@ -20,8 +20,8 @@ nohup python -u bayes_optim.py --stock 3008 --cuda 6 > ./out/optim_3008.out 2>&1
 nohup python -u bayes_optim.py --stock 3167 --cuda 7 > ./out/optim_3167.out 2>&1 &
 
 # evaluation
-python -u eval.py --stock 1476 --cuda 3 &
-python -u eval.py --stock 2330 --cuda 4 &
-python -u eval.py --stock 2731 --cuda 5 &
-python -u eval.py --stock 3008 --cuda 6 &
-python -u eval.py --stock 3167 --cuda 7 &
+python -u eval.py --stock 1476 --cuda 3 --pred_times 100 &
+python -u eval.py --stock 2330 --cuda 4 --pred_times 100 &
+python -u eval.py --stock 2731 --cuda 5 --pred_times 100 &
+python -u eval.py --stock 3008 --cuda 6 --pred_times 100 &
+python -u eval.py --stock 3167 --cuda 7 --pred_times 100 &

@@ -40,8 +40,25 @@ class DataProcessor:
         self._complete_data() 
         self.data = self.data[self.data.index > '2022-01-01']
         
-         # 加入欄位
+        # 加入欄位
         # Technical Indicators
+        self.data['7ma'] = self.EMA(self.data['Close'], 7)
+        self.data['14ma'] = self.EMA(self.data['Close'], 14)
+        self.data['21ma'] = self.EMA(self.data['Close'], 21)
+        self.data['7macd'] = self.MACD(self.data['Close'], 3, 11, 7)
+        self.data['14macd'] = self.MACD(self.data['Close'], 7, 21, 14)
+        # self.data['7rsi'] = self.RSI(self.data['Close'], 7)
+        # self.data['14rsi'] = self.RSI(self.data['Close'], 14)
+        # self.data['21rsi'] = self.RSI(self.data['Close'], 21)
+        self.data['7atr'] = self.atr(self.data['High'], self.data['Low'], 7)
+        self.data['14atr'] = self.atr(self.data['High'], self.data['Low'], 14)
+        self.data['21atr'] = self.atr(self.data['High'], self.data['Low'], 21)
+        self.data['7upper'], self.data['7lower'] = self.bollinger_band(self.data['Close'], 7)
+        self.data['14upper'], self.data['14lower'] = self.bollinger_band(self.data['Close'], 14)
+        self.data['21upper'], self.data['21lower'] = self.bollinger_band(self.data['Close'], 21)
+        # self.data['7rsv'] = self.rsv(self.data['Close'], 7)
+        # self.data['14rsv'] = self.rsv(self.data['Close'], 14)
+        # self.data['21rsv'] = self.rsv(self.data['Close'], 21)
         # self.data['cmf'] = self._cmf()
         # self.data['colose_ratio'] = self._close_ratio(window=self.time_step)
         # self.data['volume_percentile'] = self._volume_percentile(window=self.time_step)
@@ -82,6 +99,51 @@ class DataProcessor:
         end_time = datetime.now()
         print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
 
+    def SMA(self, data, windows):
+        res = data.rolling(window = windows).mean()
+        return res
+
+    def EMA(self, data, windows):
+        res = data.ewm(span = windows).mean()
+        return res
+
+    def MACD(self, data, long, short, windows):
+        short_ = data.ewm(span = short).mean()
+        long_ = data.ewm(span = long).mean()
+        macd_ = short_ - long_
+        res = macd_.ewm(span = windows).mean()
+        return res
+
+    def RSI(self, data, windows):
+        delta = data.diff(1)
+        up = delta.copy()
+        down = delta.copy()
+        up[up < 0] = 0
+        down[down > 0] = 0
+        avg_up = up.rolling(window = windows).mean()
+        avg_down = down.rolling(window = windows).mean()
+        rs = avg_up/ avg_down
+        rsi = 100. -(100./ (1. + rs))
+        return rsi
+
+    def atr(self, data_high, data_low, windows):
+        range_ = data_high - data_low
+        res = range_.rolling(window = windows).mean()
+        return res
+
+    def bollinger_band(self, data, windows):
+        sma = data.rolling(window = windows).mean()
+        std = data.rolling(window = windows).std()
+        upper = sma + 2 * std
+        lower = sma - 2 * std
+        return upper, lower
+
+    def rsv(self, data, windows):
+        min_ = data.rolling(window = windows).min()
+        max_ = data.rolling(window = windows).max()
+        res = (data - min_)/ (max_ - min_) * 100
+        return res
+    
     def _money_flow_multiplier(self):
         rolling_high = self.data['High'].rolling(window=self.time_step).max().fillna(0)
         rolling_low = self.data['Low'].rolling(window=self.time_step).min().fillna(0)
@@ -163,7 +225,7 @@ class StockDataset(Dataset):
         self._rolling_window()
     
     def _standardize(self):
-        col_list = list(self.data.columns)[:11]
+        col_list = list(self.data.columns.drop('y'))
         if self._args.mode in ['train', 'optim']:
             # scaler_X = StandardScaler()
             # scaler_y = StandardScaler()

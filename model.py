@@ -53,13 +53,11 @@ class generator(nn.Module):
              for i in range(len(self.hidden_layer_size))]
         )
         
-        # 改進的位置編碼
         self.position_encoding = PositionalEncoding(
             self.hidden_layer_size[-1] * 2,
             dropout=0.1
         )
         
-        # 多頭注意力機制的頭數應該是維度的因數
         assert self.hidden_layer_size[-1] * 2 % args.num_head_g == 0, "Hidden size must be divisible by num_heads"
         
         encoder_layers = nn.TransformerEncoderLayer(
@@ -67,21 +65,19 @@ class generator(nn.Module):
             nhead=args.num_head_g,
             dim_feedforward=self.hidden_layer_size[-1] * 4,
             dropout=0.1,
-            activation='gelu'  # 使用 GELU 激活函數
+            activation='gelu'
         )
         
         self.transformer_encoder = nn.TransformerEncoder(
             encoder_layers, 
-            num_layers=2  # 增加到2層以提升模型容量
+            num_layers=2
         )
         
-        # 加入殘差連接
         self.residual_blocks = nn.ModuleList([
             ResidualBlock(self.hidden_layer_size[-1] * 2)
             for _ in range(2)
         ])
         
-        # 改進的輸出層
         self.fc = nn.Sequential(
             nn.Linear(self.hidden_layer_size[-1] * 2 + noise_size, self.hidden_layer_size[-1] * 2),
             nn.LayerNorm(self.hidden_layer_size[-1] * 2),
@@ -200,6 +196,7 @@ class discriminator(nn.Module):
                     nn.init.zeros_(param)
     
     def forward(self, cond, x):
+        torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
         cond_embedded = self.cond_embedding(cond)
         x_embedded = self.x_embedding(x.unsqueeze(-1))
         

@@ -79,7 +79,7 @@ class wgan:
                     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
                     optimizer_d.zero_grad()
                     loss_d.backward()
-                    torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
+                    # torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
                     optimizer_d.step()
                 
                 # train generator (minimize wgan loss)
@@ -88,7 +88,7 @@ class wgan:
                 loss_g = self.generator_loss(X, fake_data)
                 optimizer_g.zero_grad()
                 loss_g.backward()
-                torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
+                # torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
                 optimizer_g.step()
                 
                 # train discriminator
@@ -204,15 +204,13 @@ if __name__ == '__main__':
         for key, value in saved_args.items():
             if hasattr(args, key):
                 setattr(args, key, value)
-    args.lr_g *= 100
-    args.lr_d *= 100
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
     train_size = int(0.95 * len(train_datasets))
     val_size = len(train_datasets) - train_size
     train_data, val_data = random_split(train_datasets, [train_size, val_size])
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
     val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
-    val_datasets = StockDataset(args, f'./data/{args.stock}/val.csv')
+    val_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     wgan_model = wgan(train_datasets, args)
     plot_util = plot_predicions(f'./logs/{args.stock}_{args.name}', args, val_datasets.time_intervals)
     
