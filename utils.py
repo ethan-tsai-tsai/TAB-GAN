@@ -6,6 +6,7 @@ import os
 import numpy as np
 from datetime import datetime, timedelta
 from scipy.linalg import sqrtm
+from scipy.special import rel_entr
 
 def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     # 計算均值差的平方
@@ -38,19 +39,32 @@ def fid_score(generated_data, real_data):
     fid_value = calculate_frechet_distance(mu1, sigma1, mu2, sigma2)
     return fid_value
 
-def calc_kld(generated_data, ground_truth):
-    pd_gt, _ = np.histogram(ground_truth, bins='auto', density=True)
-    pd_gen, _ = np.histogram(generated_data, bins='auto', density=True)
-    kld = 0
-    for x1, x2 in zip(pd_gt, pd_gen):
-        if x1 != 0 and x2 == 0:
-            kld += x1
-        elif x1 == 0 and x2 != 0:
-            kld += x2
-        elif x1 != 0 and x2 != 0:
-            kld += x1 * np.log(x1 / x2)
 
-    return np.abs(kld)
+def calc_kld(generated_data, ground_truth, bins=50, epsilon=1e-10):
+    # Find the range that covers both datasets
+    min_val = min(np.min(generated_data), np.min(ground_truth))
+    max_val = max(np.max(generated_data), np.max(ground_truth))
+    
+    # Create consistent bins for both histograms
+    bins = np.linspace(min_val, max_val, bins+1)
+    
+    # Calculate histograms with the same bins
+    pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True)
+    pd_gen, _ = np.histogram(generated_data, bins=bins, density=True)
+    
+    # Add small constant to avoid division by zero
+    pd_gt = pd_gt + epsilon
+    pd_gen = pd_gen + epsilon
+    
+    # Normalize to ensure proper probability distributions
+    pd_gt = pd_gt / np.sum(pd_gt)
+    pd_gen = pd_gen / np.sum(pd_gen)
+    
+    # Calculate KL divergence using scipy's rel_entr
+    # rel_entr computes x * log(x/y) element-wise
+    kld = np.sum(rel_entr(pd_gt, pd_gen))
+    
+    return kld
 
 def save_loss_curve(results, args):
     print('Saving loss curve')

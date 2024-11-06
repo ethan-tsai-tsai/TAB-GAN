@@ -35,11 +35,12 @@ class ResidualBlock(nn.Module):
         return self.activation(x + self.block(x))
 
 class generator(nn.Module):
-    def __init__(self, condition_size, noise_size, output_size, device, args):
+    def __init__(self, condition_size, device, args):
         super(generator, self).__init__()
         self.device = device
         self.hidden_layer_size = [args.hidden_dim_g] * args.num_layers_g
-        
+        output_size = args.target_length//args.time_step
+        noise_size = args.noise_dim
         # 加入梯度裁剪和縮放
         self.gradient_clip = args.gradient_clip if hasattr(args, 'gradient_clip') else 1.0
         
@@ -75,7 +76,7 @@ class generator(nn.Module):
         
         self.residual_blocks = nn.ModuleList([
             ResidualBlock(self.hidden_layer_size[-1] * 2)
-            for _ in range(2)
+            for _ in range(3)
         ])
         
         self.fc = nn.Sequential(
@@ -112,7 +113,6 @@ class generator(nn.Module):
         
         cond = self.position_encoding(cond)
         
-        # 加入殘差連接
         for block in self.residual_blocks:
             cond = block(cond)
             
@@ -120,7 +120,6 @@ class generator(nn.Module):
         cond_encoded = self.transformer_encoder(cond)
         cond_encoded = cond_encoded.permute(1, 0, 2)
         
-        # 使用注意力池化而不是簡單取最後一個時間步
         attn_weights = torch.softmax(torch.matmul(cond_encoded, cond_encoded.transpose(-2, -1)) / math.sqrt(cond_encoded.size(-1)), dim=-1)
         cond_latent = torch.matmul(attn_weights, cond_encoded).mean(dim=1)
         

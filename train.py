@@ -14,7 +14,7 @@ class wgan:
         self.args = args
         self.device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
         self.model_d = discriminator(stock_data.num_features - 1, 1, self.device, self.args).to(self.device)
-        self.model_g = generator(stock_data.num_features - 1, self.args.noise_dim, self.args.target_length//self.args.time_step, self.device, self.args).to(self.device)
+        self.model_g = generator(stock_data.num_features - 1, self.device, self.args).to(self.device)
         self.BEST_KLD = np.inf
 
         # initialize folder
@@ -79,7 +79,6 @@ class wgan:
                     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
                     optimizer_d.zero_grad()
                     loss_d.backward()
-                    # torch.nn.utils.clip_grad_norm_(self.model_d.parameters(), max_norm=1.0)
                     optimizer_d.step()
                 
                 # train generator (minimize wgan loss)
@@ -88,7 +87,6 @@ class wgan:
                 loss_g = self.generator_loss(X, fake_data)
                 optimizer_g.zero_grad()
                 loss_g.backward()
-                # torch.nn.utils.clip_grad_norm_(self.model_g.parameters(), max_norm=1.0)
                 optimizer_g.step()
                 
                 # train discriminator
