@@ -89,17 +89,6 @@ class wgan:
                 loss_g.backward()
                 optimizer_g.step()
                 
-                # train discriminator
-                # for _ in range(self.args.d_iter):
-                #     noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                #     fake_data = self.model_g(X, noise)
-                #     assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
-                #     gradient_penalty = self.compute_gradient_penalty(X, y, fake_data)
-                #     loss_d = self.discriminator_loss(X, y, fake_data, gradient_penalty)
-                #     optimizer_d.zero_grad()
-                #     loss_d.backward()
-                #     optimizer_d.step()
-                
                 # train generator (minimize mae loss)
                 noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
                 fake_data = self.model_g(X, noise)
@@ -119,7 +108,6 @@ class wgan:
             
             if (epoch+1)%(self.args.epoch//10)==0:
                 if self.args.mode == 'train': self.validation_plot(val_datasets, f'Epoch{epoch + 1}_chart')
-                # print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_g: {mae_loss}')
                 print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
                 
         return results
@@ -151,7 +139,7 @@ class wgan:
                 fid = fid_score(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
                 if kld < self.BEST_KLD and kld != np.inf:
                     self.BEST_KLD = kld
-                    if self.args.mode=='train': # do not print messages when choosing other mode
+                    if self.args.mode=='train': 
                         file_name = f'./model/{self.args.stock}_{self.args.name}/best.pth'
                         save_model(self.model_d, self.model_g, self.args, file_name)
                         print(f'update best model with kld = {kld}')

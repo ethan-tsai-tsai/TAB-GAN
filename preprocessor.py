@@ -206,7 +206,7 @@ class StockDataset(Dataset):
     def __init__(self, args, csv_file):
         # setting parameters
         self._args = args
-        self.time_step = args.time_step # 每隔幾分鐘取出一筆資料
+        self.time_step = args.time_step
         self.target_length = args.target_length // args.time_step
         self.seq_len = args.window_size * (270 // args.time_step)
         self.window_size = args.window_size
@@ -227,8 +227,6 @@ class StockDataset(Dataset):
     def _standardize(self):
         col_list = list(self.data.columns.drop('y'))
         if self._args.mode in ['train', 'optim']:
-            # scaler_X = StandardScaler()
-            # scaler_y = StandardScaler()
             scaler_X = MinMaxScaler(feature_range=[-1, 1])
             scaler_y = MinMaxScaler(feature_range=[-1, 1])
             self.data[col_list] = scaler_X.fit_transform(self.data[col_list].values)
