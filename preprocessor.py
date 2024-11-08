@@ -10,13 +10,13 @@ from utils import *
 from arguments import *
 
 class DataProcessor:
-    def __init__(self, args):
+    def __init__(self, args, trial=1):
         path = f'./data/{args.stock}'
         if not os.path.exists(path): os.makedirs(path)
         # else: clear_folder(path)
                
         self.args = args
-        
+        self.trial = trial
         print('Processing data ......')
         start_time = datetime.now()
         
@@ -38,7 +38,6 @@ class DataProcessor:
          # 補全缺失值
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
         self._complete_data() 
-        self.data = self.data[self.data.index > '2022-01-01']
         
         # saving file while mode is simulate
         if args.mode == 'simulate':
@@ -95,8 +94,11 @@ class DataProcessor:
         # split and save dataframe
         seq_len = 270//self.args.time_step
         window_size = 5
-        test_dataframe = self.data.iloc[-seq_len* 8:, :]
-        train_dataframe = self.data.iloc[:-seq_len * 5, :]
+        test_idx = (window_size * self.trial) * seq_len # 10
+        if trial == 1: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):, :]
+        # [-10, -5]
+        else: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):-(test_idx - seq_len * window_size), :]
+        train_dataframe = self.data.iloc[-(test_idx + seq_len * 365 * 2):-test_idx, :]
         # val_dataframe = self.data[(self.data.index.month==8) & (self.data.index.year==2024)]
 
         train_dataframe.to_csv(f'{path}/train.csv')
