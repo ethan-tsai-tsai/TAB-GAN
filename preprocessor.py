@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 import pickle
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 from utils import *
 from arguments import *
@@ -32,13 +32,18 @@ class DataProcessor:
         
         # 資料處理
         self.data['ts'] = pd.to_datetime(self.data['ts'])
-        self.data.set_index(self.data['ts'], inplace=True)
+        self.data.set_index('ts', inplace=True)
         self.data = self.data.groupby(self.data.index).mean() # 重複日期
         
          # 補全缺失值
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
         self._complete_data() 
         self.data = self.data[self.data.index > '2022-01-01']
+        
+        # saving file while mode is simulate
+        if args.mode == 'simulate':
+            self.data = self.data.iloc[::self.time_step, :]
+            return self.data
         
         # 加入欄位
         # Technical Indicators
@@ -86,15 +91,17 @@ class DataProcessor:
         # prevent error
         assert not self.data.isnull().values.any(), 'There are missing values in the data.'
         assert not np.isinf(self.data.values).any(), 'There are inf values in the data.'
-
+        
         # split and save dataframe
-        test_dataframe = self.data.iloc[-(270//self.args.time_step) * 8:, :]
-        train_dataframe = self.data.iloc[:-(270//self.args.time_step) * 5, :]
-        val_dataframe = self.data[(self.data.index.month==8) & (self.data.index.year==2024)]
+        seq_len = 270//self.args.time_step
+        window_size = 5
+        test_dataframe = self.data.iloc[-seq_len* 8:, :]
+        train_dataframe = self.data.iloc[:-seq_len * 5, :]
+        # val_dataframe = self.data[(self.data.index.month==8) & (self.data.index.year==2024)]
 
         train_dataframe.to_csv(f'{path}/train.csv')
         test_dataframe.to_csv(f'{path}/test.csv')
-        val_dataframe.to_csv(f'{path}/val.csv')
+        # val_dataframe.to_csv(f'{path}/val.csv')
 
         end_time = datetime.now()
         print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
@@ -177,10 +184,10 @@ class DataProcessor:
     def _price_change(self, data):
         changes = [0]
         for i in range(1, len(data)):
-            if data[i - 1] == 0:
+            if data.iloc[i - 1] == 0:
                 changes.append(0)
             else:
-                change = (data[i] - data[i - 1]) / data[i - 1] * 100
+                change = (data.iloc[i] - data.iloc[i - 1]) / data.iloc[i - 1] * 100
                 changes.append(change)
         return changes   
  
@@ -190,17 +197,17 @@ class DataProcessor:
         for date in self.time_intervals:
             start_time = pd.to_datetime(date + ' 09:01:00')
             end_time = pd.to_datetime(date +' 13:30:00')
-            datetime_range = pd.date_range(start_time, end_time, freq='T')
-            new_idx += datetime_range
+            datetime_range = pd.date_range(start_time, end_time, freq='min')
+            new_idx += list(datetime_range)
         self.data = self.data.reindex(new_idx)
         
         # fill missing values
-        self.data['Open'] = self.data['Open'].fillna(method='ffill').interpolate(method='linear')
-        self.data['High'] = self.data['High'].fillna(method='ffill').interpolate(method='linear')
-        self.data['Low'] = self.data['Low'].fillna(method='ffill').interpolate(method='linear')
-        self.data['Close'] = self.data['Close'].fillna(method='ffill').interpolate(method='linear')
-        self.data['Volume'] = self.data['Volume'].fillna(method='ffill').interpolate(method='linear')
-        self.data['Amount'] = self.data['Amount'].fillna(method='ffill').interpolate(method='linear')
+        self.data['Open'] = self.data['Open'].ffill().interpolate(method='linear')
+        self.data['High'] = self.data['High'].ffill().interpolate(method='linear')
+        self.data['Low'] = self.data['Low'].ffill().interpolate(method='linear')
+        self.data['Close'] = self.data['Close'].ffill().interpolate(method='linear')
+        self.data['Volume'] = self.data['Volume'].ffill().interpolate(method='linear')
+        self.data['Amount'] = self.data['Amount'].ffill().interpolate(method='linear')
 
 class StockDataset(Dataset):
     def __init__(self, args, csv_file):
@@ -227,8 +234,8 @@ class StockDataset(Dataset):
     def _standardize(self):
         col_list = list(self.data.columns.drop('y'))
         if self._args.mode in ['train', 'optim']:
-            scaler_X = MinMaxScaler(feature_range=[-1, 1])
-            scaler_y = MinMaxScaler(feature_range=[-1, 1])
+            scaler_X = MinMaxScaler(feature_range=(-1, 1))
+            scaler_y = MinMaxScaler(feature_range=(-1, 1))
             self.data[col_list] = scaler_X.fit_transform(self.data[col_list].values)
             self.data['y'] = scaler_y.fit_transform(self.data[['y']].values)
             # save the scaler for testing purposes
