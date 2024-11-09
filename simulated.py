@@ -42,7 +42,9 @@ class StockSimulator:
     
     def load_data(self):
         """載入原始數據"""
-        self.df = DataProcessor(self.args)
+        processor = DataProcessor(args)
+        self.df = processor.get_data()
+        self.df['ts'] = self.df.index
         self.cols = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount']
     
     def create_trading_future_df(self, model):
@@ -58,8 +60,7 @@ class StockSimulator:
         
         mask = (
             (future['time_of_day'] >= start_time) & 
-            (future['time_of_day'] <= end_time) &
-            (future['weekday'] < 5)
+            (future['time_of_day'] <= end_time)
         )
         filtered_future = future[mask].copy()
         filtered_future = filtered_future.reset_index(drop=True)[['ds']]
@@ -67,62 +68,110 @@ class StockSimulator:
         return filtered_future
     
     def generate_garch_errors(self, data, n_sim):
-        """使用 rmgarch 生成誤差項"""
+        """使用改進的 GARCH 模型生成誤差項"""
         r_data = pandas2ri.py2rpy(pd.DataFrame(data))
         
         r_code = """
         function(data, n_sim) {
-            spec = ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(1,1)),
-                             mean.model=list(armaOrder=c(0,0)))
-            fit = ugarchfit(spec, data[,1])
-            sim = ugarchsim(fit, n.sim=n_sim)
-            return sigma(sim)
+            library(rmgarch)
+            
+            # 使用更穩定的 GARCH 模型設定
+            spec <- ugarchspec(
+                variance.model = list(
+                    model = "sGARCH",
+                    garchOrder = c(1,1)
+                ),
+                mean.model = list(
+                    armaOrder = c(0,0),
+                    include.mean = TRUE
+                ),
+                distribution.model = "std"  # 使用 t 分布
+            )
+            
+            # 使用更多的最佳化選項
+            ctrl = list(
+                tol = 1e-6,           # 容忍度
+                delta = 1e-7,         # delta
+                maxiter = 500,        # 最大迭代次數
+                scale = 1,            # 縮放因子
+                rec.init = 'all'      # 遞迴初始化
+            )
+            
+            tryCatch({
+                fit <- ugarchfit(spec, data[,1], 
+                               solver = 'hybrid',
+                               solver.control = ctrl,
+                               fit.control = list(scale = 1))
+                
+                sim <- ugarchsim(fit, n.sim = n_sim)
+                vol <- sigma(sim)
+                
+                # 確保返回合理的值
+                vol[is.na(vol)] <- mean(vol, na.rm = TRUE)
+                vol[vol <= 0] <- mean(vol[vol > 0])
+                
+                return(as.numeric(vol))
+            }, error = function(e) {
+                # 如果模型擬合失敗，使用簡單的移動標準差
+                e
+                sd <- sd(data[,1], na.rm = TRUE)
+                return(rep(sd, n_sim))
+            })
         }
         """
         
-        r_func = robjects.r(r_code)
-        errors = np.array(r_func(r_data, n_sim))
-        
-        return errors
+        try:
+            r_func = robjects.r(r_code)
+            errors = np.array(r_func(r_data, n_sim))
+            
+            # 確保誤差項是合理的
+            if np.any(np.isnan(errors)):
+                print("警告: 發現 NaN 值，使用均值替代")
+                errors = np.nan_to_num(errors, nan=np.nanmean(errors))
+            
+            # 標準化誤差項
+            errors = errors / np.std(errors) * np.std(data)
+            
+            return errors.flatten()
+            
+        except Exception as e:
+            print(f"GARCH 模型執行錯誤: {str(e)}")
+            return np.random.normal(0, np.std(data), n_sim)
     
     def plot_components(self, col, forecast, errors):
         """繪製並保存組件分解圖"""
-        plt.style.use('seaborn')
-        
-        # 設置中文字體
-        plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei']
-        plt.rcParams['axes.unicode_minus'] = False
+        plt.style.use('default')
         
         # 創建子圖
         fig, axes = plt.subplots(4, 1, figsize=(15, 20))
-        fig.suptitle(f'{self.args.stock} {col} 組件分解', fontsize=16, y=0.95)
+        fig.suptitle(f'{self.args.stock} {col}', fontsize=16, y=0.95)
         
         # 1. 趨勢圖
         axes[0].plot(forecast['ds'], forecast['trend'], 'b-', linewidth=2)
-        axes[0].set_title('趨勢組件')
-        axes[0].set_xlabel('日期')
-        axes[0].set_ylabel('值')
+        axes[0].set_title('Trend')
+        axes[0].set_xlabel('Date')
+        axes[0].set_ylabel('Value')
         axes[0].grid(True)
         
         # 2. 年度季節性
         axes[1].plot(forecast['ds'], forecast['yearly'], 'g-', linewidth=2)
-        axes[1].set_title('年度季節性')
-        axes[1].set_xlabel('日期')
-        axes[1].set_ylabel('值')
+        axes[1].set_title('Yearly seasonal')
+        axes[1].set_xlabel('Date')
+        axes[1].set_ylabel('Value')
         axes[1].grid(True)
         
         # 3. 日內季節性
         axes[2].plot(forecast['ds'], forecast['daily'], 'r-', linewidth=2)
-        axes[2].set_title('日內季節性')
-        axes[2].set_xlabel('日期')
-        axes[2].set_ylabel('值')
+        axes[2].set_title('Daily seasonal')
+        axes[2].set_xlabel('Date')
+        axes[2].set_ylabel('Value')
         axes[2].grid(True)
         
         # 4. 誤差項
         axes[3].plot(forecast['ds'], errors, 'k-', linewidth=2)
-        axes[3].set_title('GARCH 誤差項')
-        axes[3].set_xlabel('日期')
-        axes[3].set_ylabel('值')
+        axes[3].set_title('GARCH error')
+        axes[3].set_xlabel('Date')
+        axes[3].set_ylabel('value')
         axes[3].grid(True)
         
         plt.tight_layout()
@@ -160,11 +209,11 @@ class StockSimulator:
         self.plot_components(col, forecast, errors)
         
         # 合成最終序列
-        simulated = (forecast['trend'] + 
-                    forecast['yearly'] + 
-                    forecast['weekly'] + 
-                    forecast['daily'] + 
-                    errors)
+        simulated = (forecast['trend'].values + 
+                    forecast['yearly'].values + 
+                    forecast['weekly'].values + 
+                    forecast['daily'].values + 
+                    errors.flatten())
         
         return simulated
     
@@ -172,7 +221,7 @@ class StockSimulator:
         """模擬所有價格序列"""
         simulated_data = pd.DataFrame()
         simulated_data['ts'] = self.df['ts']
-        
+
         for col in self.cols:
             simulated_data[col] = self.simulate_price_series(col)
         
@@ -184,15 +233,15 @@ class StockSimulator:
     
     def plot_comparison(self, simulated_data):
         """繪製原始數據和模擬數據的比較圖"""
-        plt.style.use('seaborn')
+        plt.style.use('default')
         
         for col in self.cols:
             plt.figure(figsize=(15, 8))
-            plt.plot(self.df['ts'], self.df[col], 'b-', label='原始數據', alpha=0.6)
-            plt.plot(simulated_data['ts'], simulated_data[col], 'r-', label='模擬數據', alpha=0.6)
-            plt.title(f'{self.args.stock} {col} 原始vs模擬數據比較')
-            plt.xlabel('時間')
-            plt.ylabel('值')
+            plt.plot(self.df['ts'], self.df[col], 'b-', label='raw data', alpha=0.6)
+            plt.plot(simulated_data['ts'], simulated_data[col], 'r-', label='simulated', alpha=0.6)
+            plt.title(f'{self.args.stock} {col} original v.s. simulated data')
+            plt.xlabel('Time')
+            plt.ylabel('Value')
             plt.legend()
             plt.grid(True)
             plt.tight_layout()

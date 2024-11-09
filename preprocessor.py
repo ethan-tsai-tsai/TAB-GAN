@@ -11,72 +11,72 @@ from arguments import *
 
 class DataProcessor:
     def __init__(self, args, trial=1):
-        path = f'./data/{args.stock}'
-        if not os.path.exists(path): os.makedirs(path)
-        # else: clear_folder(path)
-               
         self.args = args
         self.trial = trial
         print('Processing data ......')
-        start_time = datetime.now()
+        self.start_time = datetime.now()
         
+        # 創建資料夾
+        path = f'./data/{args.stock}'
+        if not os.path.exists(path): os.makedirs(path)
+        
+        # 初始化數據
+        self._initialize_data()
+        
+        # 根據模式處理數據
+        if args.mode == 'simulate':
+            self._process_simulation_data()
+        else:
+            self._process_training_data()
+            
+        print(f'Data processing spent {(datetime.now() - self.start_time).total_seconds(): 2f} seconds')
+    
+    def _initialize_data(self):
+        """初始化基本數據處理"""
         # load data
-        self.data = pd.read_csv(f'./data/{args.stock}.csv').sort_values(by='ts')
+        self.data = pd.read_csv(f'./data/{self.args.stock}.csv').sort_values(by='ts')
         
         # 取得參數
-        self.time_step = args.time_step # 每隔幾分鐘取出一筆資料
-        self.target_length = args.target_length // args.time_step # y的資料筆數 
-        self.seq_len = args.window_size * (270 // args.time_step) # X的資料筆數
-        self.window_size = args.window_size # 移動窗格大小
-        self.window_stride = args.window_stride # 移動窗格的移動步伐
+        self.time_step = self.args.time_step
+        self.target_length = self.args.target_length // self.args.time_step
+        self.seq_len = self.args.window_size * (270 // self.args.time_step)
+        self.window_size = self.args.window_size
+        self.window_stride = self.args.window_stride
         
-        # 資料處理
+        # 基本資料處理
         self.data['ts'] = pd.to_datetime(self.data['ts'])
         self.data.set_index('ts', inplace=True)
-        self.data = self.data.groupby(self.data.index).mean() # 重複日期
+        self.data = self.data.groupby(self.data.index).mean()
         
-         # 補全缺失值
-        self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist() # 資料中的日期
-        self._complete_data() 
+        # 補全缺失值
+        self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist()
+        self._complete_data()
+        self.data = self.data.iloc[::self.time_step, :]
+
+    def _process_simulation_data(self):
+        """處理模擬模式的數據"""
+        return self.data
+    
+    def _process_training_data(self):
+        """處理訓練模式的數據"""
+        # 加入技術指標
+        self._add_technical_indicators()
         
-        # saving file while mode is simulate
-        if args.mode == 'simulate':
-            self.data = self.data.iloc[::self.time_step, :]
-            return self.data
-        
-        # 加入欄位
-        # Technical Indicators
-        self.data['7ma'] = self.EMA(self.data['Close'], 7)
-        self.data['14ma'] = self.EMA(self.data['Close'], 14)
-        self.data['21ma'] = self.EMA(self.data['Close'], 21)
-        self.data['7macd'] = self.MACD(self.data['Close'], 3, 11, 7)
-        self.data['14macd'] = self.MACD(self.data['Close'], 7, 21, 14)
-        # self.data['7rsi'] = self.RSI(self.data['Close'], 7)
-        # self.data['14rsi'] = self.RSI(self.data['Close'], 14)
-        # self.data['21rsi'] = self.RSI(self.data['Close'], 21)
-        self.data['7atr'] = self.atr(self.data['High'], self.data['Low'], 7)
-        self.data['14atr'] = self.atr(self.data['High'], self.data['Low'], 14)
-        self.data['21atr'] = self.atr(self.data['High'], self.data['Low'], 21)
-        self.data['7upper'], self.data['7lower'] = self.bollinger_band(self.data['Close'], 7)
-        self.data['14upper'], self.data['14lower'] = self.bollinger_band(self.data['Close'], 14)
-        self.data['21upper'], self.data['21lower'] = self.bollinger_band(self.data['Close'], 21)
-        # self.data['7rsv'] = self.rsv(self.data['Close'], 7)
-        # self.data['14rsv'] = self.rsv(self.data['Close'], 14)
-        # self.data['21rsv'] = self.rsv(self.data['Close'], 21)
-        # self.data['cmf'] = self._cmf()
-        # self.data['colose_ratio'] = self._close_ratio(window=self.time_step)
-        # self.data['volume_percentile'] = self._volume_percentile(window=self.time_step)
-        
-        # 切割掉第一天（技術指標大多沒有值）
-        self.data = self.data.iloc[270::, :]
-        
-        # ※根據處理資料的方式，分為在切割資料前和後
-        self.data = self.data.iloc[::self.time_step, :] # 每 time_step 分鐘取一筆資料
-        
+        # 後續處理
+        self.data = self.data.iloc[(270//self.args.time_step)*30::, :]
+        self._add_additional_features()
+        self._split_and_save_data()
+    
+    def _add_technical_indicators(self):
+        """添加技術指標"""
+        self.data = TechnicalIndicators.add_all_indicators(self.data)
+    
+    def _add_additional_features(self):
+        """添加額外特徵"""
         self.data['y'] = self.data['Close']
         self.data['change'] = self._price_change(self.data['y'])
         
-        ## Date Columns
+        # Date Columns
         self.data['year'] = self.data.index.to_series().dt.year
         self.data['month'] = self.data.index.to_series().dt.month
         self.data['day'] = self.data.index.to_series().dt.day
@@ -84,18 +84,17 @@ class DataProcessor:
         self.data['hour'] = self.data.index.to_series().dt.hour
         self.data['minute'] = self.data.index.to_series().dt.minute
         
-        columns = [col for col in self.data.columns if col != 'y'] + ['y'] # arrange columns
+        # 重排列欄位
+        columns = [col for col in self.data.columns if col != 'y'] + ['y']
         self.data = self.data[columns]
-        
-        # prevent error
-        assert not self.data.isnull().values.any(), 'There are missing values in the data.'
-        assert not np.isinf(self.data.values).any(), 'There are inf values in the data.'
-        
-        # split and save dataframe
+    
+    def _split_and_save_data(self):
+        """分割並保存數據"""
+        path = f'./data/{self.args.stock}'
         seq_len = 270//self.args.time_step
         window_size = 5
         test_idx = (window_size * self.trial) * seq_len # 10
-        if trial == 1: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):, :]
+        if self.trial == 1: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):, :]
         # [-10, -5]
         else: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):-(test_idx - seq_len * window_size), :]
         train_dataframe = self.data.iloc[-(test_idx + seq_len * 365 * 2):-test_idx, :]
@@ -104,85 +103,7 @@ class DataProcessor:
         train_dataframe.to_csv(f'{path}/train.csv')
         test_dataframe.to_csv(f'{path}/test.csv')
         # val_dataframe.to_csv(f'{path}/val.csv')
-
-        end_time = datetime.now()
-        print(f'Data processing spent {(end_time - start_time).total_seconds(): 2f} seconds')
-
-    def SMA(self, data, windows):
-        res = data.rolling(window = windows).mean()
-        return res
-
-    def EMA(self, data, windows):
-        res = data.ewm(span = windows).mean()
-        return res
-
-    def MACD(self, data, long, short, windows):
-        short_ = data.ewm(span = short).mean()
-        long_ = data.ewm(span = long).mean()
-        macd_ = short_ - long_
-        res = macd_.ewm(span = windows).mean()
-        return res
-
-    def RSI(self, data, windows):
-        delta = data.diff(1)
-        up = delta.copy()
-        down = delta.copy()
-        up[up < 0] = 0
-        down[down > 0] = 0
-        avg_up = up.rolling(window = windows).mean()
-        avg_down = down.rolling(window = windows).mean()
-        rs = avg_up/ avg_down
-        rsi = 100. -(100./ (1. + rs))
-        return rsi
-
-    def atr(self, data_high, data_low, windows):
-        range_ = data_high - data_low
-        res = range_.rolling(window = windows).mean()
-        return res
-
-    def bollinger_band(self, data, windows):
-        sma = data.rolling(window = windows).mean()
-        std = data.rolling(window = windows).std()
-        upper = sma + 2 * std
-        lower = sma - 2 * std
-        return upper, lower
-
-    def rsv(self, data, windows):
-        min_ = data.rolling(window = windows).min()
-        max_ = data.rolling(window = windows).max()
-        res = (data - min_)/ (max_ - min_) * 100
-        return res
-    
-    def _money_flow_multiplier(self):
-        rolling_high = self.data['High'].rolling(window=self.time_step).max().fillna(0)
-        rolling_low = self.data['Low'].rolling(window=self.time_step).min().fillna(0)
-        money_flow_multiplier = ((self.data['Close'] - rolling_low) - (rolling_high - self.data['Close'])) / (rolling_high - rolling_low)
-        return money_flow_multiplier
-        
-    def _money_flow_volume(self):
-        money_flow_multiplier = self._money_flow_multiplier()
-        rolling_volume = self.data['Volume'].rolling(window=self.time_step).sum().fillna(0)
-        money_flow_volume = money_flow_multiplier * rolling_volume
-        return money_flow_volume
-        
-    def _cmf(self):
-        money_flow_volume = self._money_flow_volume()
-        rolling_volume = self.data['Volume'].rolling(window=self.time_step).sum().fillna(0)
-        rolling_money_flow_volume = money_flow_volume.rolling(window=self.time_step).sum().fillna(0)
-        cmf = rolling_money_flow_volume / rolling_volume
-        return cmf
-    
-    def _close_ratio(self, window):
-        money_flow_multiplier = self._money_flow_multiplier()
-        close_ratio = money_flow_multiplier.rolling(window=window).mean().fillna(0)
-        return close_ratio
-    
-    def _volume_percentile(self, window):
-        rolling_volume = self.data['Volume'].rolling(window=window).mean().fillna(0)
-        percentile = np.percentile(rolling_volume, np.arange(101))
-        volume_percentile = pd.cut(rolling_volume, bins=percentile, labels=False, duplicates='drop').fillna(0)
-        return volume_percentile
-    
+ 
     def _price_change(self, data):
         changes = [0]
         for i in range(1, len(data)):
@@ -211,6 +132,10 @@ class DataProcessor:
         self.data['Volume'] = self.data['Volume'].ffill().interpolate(method='linear')
         self.data['Amount'] = self.data['Amount'].ffill().interpolate(method='linear')
 
+    def get_data(self):
+        """獲取處理後的數據"""
+        return self.data
+    
 class StockDataset(Dataset):
     def __init__(self, args, csv_file):
         # setting parameters
@@ -270,7 +195,7 @@ class StockDataset(Dataset):
 
     def __getitem__(self, idx):
         return torch.tensor(self.X[idx], dtype=torch.float32), torch.tensor(self.y[idx], dtype=torch.float32)
-    
+
 if __name__ == '__main__':
     args = parse_args()
     data_processor = DataProcessor(args)

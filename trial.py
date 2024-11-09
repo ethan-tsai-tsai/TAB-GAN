@@ -5,7 +5,6 @@ from subprocess import Popen, PIPE
 from arguments import parse_args
 from preprocessor import *
 
-
 def run_trial(args, trial):
     print(f"\n{'='*50}")
     print(f"Trial {trial}")
@@ -16,7 +15,7 @@ def run_trial(args, trial):
     _ = DataProcessor(args, trial)
     
     # set up variables
-    args.name = f'trial_{trial}'
+    name = f'trial_{trial}'
     
     for script in scripts:
         print(f"執行 {script}")
@@ -24,7 +23,7 @@ def run_trial(args, trial):
         try:
             # 使用 Popen 即時顯示輸出
             process = Popen(
-                [sys.executable, script],
+                [sys.executable, script, '--name', name],
                 stdout=PIPE,
                 stderr=PIPE,
                 bufsize=1,

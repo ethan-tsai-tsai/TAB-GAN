@@ -43,14 +43,14 @@ class generator(nn.Module):
         noise_size = args.noise_dim
         # 加入梯度裁剪和縮放
         self.gradient_clip = args.gradient_clip if hasattr(args, 'gradient_clip') else 1.0
+        self.dropout = nn.Dropout(p=0.1)
         
         # 使用 GRU 替代 LSTM，減少參數量並避免梯度消失
         self.gru_list = nn.ModuleList(
             [nn.GRU(condition_size if i == 0 else self.hidden_layer_size[i-1] * 2, 
                     self.hidden_layer_size[i], 
                     batch_first=True, 
-                    bidirectional=True,
-                    dropout=0.1 if i < len(self.hidden_layer_size)-1 else 0) 
+                    bidirectional=True) 
              for i in range(len(self.hidden_layer_size))]
         )
         
@@ -110,6 +110,7 @@ class generator(nn.Module):
         for i in range(len(self.gru_list)):
             h0 = torch.zeros(2, cond.size(0), self.hidden_layer_size[i]).to(self.device)
             cond, _ = self.gru_list[i](cond, h0)
+            cond = self.dropout(cond)
         
         cond = self.position_encoding(cond)
         
