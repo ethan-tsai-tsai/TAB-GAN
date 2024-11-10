@@ -1,448 +1,465 @@
-import os
 import numpy as np
 import pandas as pd
 from prophet import Prophet
 import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy import stats
-from rpy2 import robjects
+from datetime import datetime, timedelta
+from typing import List, Tuple, Dict, Optional
+import rpy2.robjects as ro
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
+import warnings
+warnings.filterwarnings('ignore')
+
 from arguments import parse_args
 from preprocessor import DataProcessor
+from utils import *
 
-class StockSimulator:
-    def __init__(self, args, trading_days=0):
+class DCCGARCHSimulator:
+    def __init__(self, data: pd.DataFrame):
         """
-        初始化股票模擬器
+        初始化模擬器
         
         Parameters:
-        trading_days: 要模擬的交易天數
+        -----------
+        data : pd.DataFrame
+            輸入數據，index 為時間戳，columns 為不同資產
         """
-        self.args = args
-        self.trading_days = trading_days
-        self.setup_paths()
-        self.setup_r_environment()
-        self.load_data()
+        self.data = data
+        self.n_series = len(data.columns)
+        self.prophet_models = {}
+        self.decomposition = {}
         
-    def setup_paths(self):
-        """設置相關路徑"""
-        self.data_path = f'./data/{self.args.stock}_data.csv'
-        self.save_path = f'./data/simulated/{self.args.stock}'
-        self.img_path = f'./img/simulate/{self.args.stock}'
-        
-        # 創建必要的目錄
-        for path in [self.save_path, self.img_path]:
-            if not os.path.exists(path):
-                os.makedirs(path)
-    
-    def setup_r_environment(self):
-        """設置 R 環境"""
+        # 初始化 R 環境
         pandas2ri.activate()
         self.rmgarch = importr('rmgarch')
-    
-    def load_data(self):
-        """載入原始數據"""
-        processor = DataProcessor(args)
-        self.df = processor.get_data()
-        self.df['ts'] = self.df.index
-        self.cols = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount']
+        self.rugarch = importr('rugarch')
+        base = importr('base')
         
-        # 計算各欄位的統計特性
-        self.calc_data_statistics()
-    
-    def calc_data_statistics(self):
-        """計算原始數據的統計特性"""
-        self.stats = {}
-        
-        for col in self.cols:
-            self.stats[col] = {
-                'mean': self.df[col].mean(),
-                'std': self.df[col].std(),
-                'min': self.df[col].min(),
-                'max': self.df[col].max(),
-                'q01': self.df[col].quantile(0.01),
-                'q99': self.df[col].quantile(0.99),
-                'autocorr': self.df[col].autocorr()
-            }
+    def decompose_series(self) -> None:
+        """使用 Prophet 對每個序列進行趨勢和季節性分解"""
+        for col in self.data.columns:
+            print(f'Fitting column: {col}')
+            # 準備 Prophet 數據
+            df = pd.DataFrame({
+                'ds': self.data.index,
+                'y': self.data[col]
+            })
             
-            # 計算對數收益率的統計特性
-            if col != 'Volume' and col != 'Amount':
-                returns = np.log(self.df[col]).diff()
-                self.stats[f'{col}_returns'] = {
-                    'mean': returns.mean(),
-                    'std': returns.std(),
-                    'autocorr': returns.autocorr()
-                }
-        
-        # 計算價格之間的相對關係
-        self.calc_price_relations()
+            # 擬合 Prophet 模型
+            model = Prophet(
+                yearly_seasonality=True,
+                weekly_seasonality=True,
+                daily_seasonality=False,
+                changepoint_prior_scale=0.05
+            )
+            model.fit(df)
+            
+            self.prophet_models[col] = model
+            
+            # 獲取分解結果
+            forecast = model.predict(df)
+            self.decomposition[col] = {
+                'trend': forecast['trend'].values,
+                'seasonal': (forecast['yearly'] + forecast['weekly']).values,
+                'residuals': self.data[col].values - forecast['yhat'].values
+            }
     
-    def calc_price_relations(self):
-        """計算價格之間的關係統計"""
-        # 計算High/Low相對於中間價格的偏離程度
-        mid_price = (self.df['Open'] + self.df['Close']) / 2
-        self.stats['price_relations'] = {
-            'high_deviation': ((self.df['High'] - mid_price) / mid_price).mean(),
-            'low_deviation': ((mid_price - self.df['Low']) / mid_price).mean(),
-            'volume_price_ratio': (self.df['Volume'] * self.df['Close'] / self.df['Amount']).median()
-        }
-    
-    def apply_volatility_constraints(self, simulated):
-        """應用波動率約束"""
-        # 使用移動窗口計算歷史波動率
-        window = 20
-        hist_vol = self.df['Close'].pct_change().rolling(window).std()
-        avg_vol = hist_vol.mean()
-        max_vol = hist_vol.quantile(0.99)
+    def fit_dcc_garch(self) -> None:
+        """使用 R 的 rmgarch 套件擬合 DCC-GARCH 模型"""
+        # 收集所有序列的殘差
+        residuals = pd.DataFrame({
+            col: self.decomposition[col]['residuals']
+            for col in self.data.columns
+        })
         
-        # 限制模擬數據的波動率
-        returns = pd.Series(simulated).pct_change()
-        rolling_vol = returns.rolling(window).std()
+        # 數據預處理
+        print("Checking residuals statistics:")
+        print(residuals.describe())
         
-        # 如果波動率超過限制，進行調整
-        scale_factor = np.minimum(1, max_vol / rolling_vol)
-        adjusted_returns = returns * scale_factor
+        # 標準化殘差
+        residuals = (residuals - residuals.mean()) / residuals.std()
         
-        # 轉換回價格序列
-        adjusted_price = np.exp(np.log(simulated[0]) + np.cumsum(adjusted_returns))
-        
-        return adjusted_price
-        
-    def create_trading_future_df(self, model):
-        """生成交易日的未來時間序列"""
-        periods = self.trading_days * 9
-        future = model.make_future_dataframe(periods=periods, freq='30min')
-        
-        future['time_of_day'] = future['ds'].dt.time
-        future['weekday'] = future['ds'].dt.weekday
-        
-        start_time = pd.to_datetime('09:01').time()
-        end_time = pd.to_datetime('13:01').time()
-        
-        mask = (
-            (future['time_of_day'] >= start_time) & 
-            (future['time_of_day'] <= end_time)
-        )
-        filtered_future = future[mask].copy()
-        filtered_future = filtered_future.reset_index(drop=True)[['ds']]
-        
-        return filtered_future
-    
-    def generate_garch_errors(self, data, n_sim):
-        """使用改進的 GARCH 模型生成誤差項"""
-        r_data = pandas2ri.py2rpy(pd.DataFrame(data))
+        # 將 Python 數據轉換為 R 格式
+        r_residuals = pandas2ri.py2rpy(residuals)
         
         r_code = """
-        function(data, n_sim) {
+        function(data, n_series) {
             library(rmgarch)
             
-            # 使用更穩定的 GARCH 模型設定
-            spec <- ugarchspec(
-                variance.model = list(
-                    model = "sGARCH",
-                    garchOrder = c(1,1)
-                ),
-                mean.model = list(
-                    armaOrder = c(0,0),
-                    include.mean = TRUE
-                ),
-                distribution.model = "std"  # 使用 t 分布
-            )
-            
-            # 使用更多的最佳化選項
-            ctrl = list(
-                tol = 1e-6,           # 容忍度
-                delta = 1e-7,         # delta
-                maxiter = 500,        # 最大迭代次數
-                scale = 1,            # 縮放因子
-                rec.init = 'all'      # 遞迴初始化
-            )
-            
             tryCatch({
-                fit <- ugarchfit(spec, data[,1], 
-                               solver = 'hybrid',
-                               solver.control = ctrl,
-                               fit.control = list(scale = 1))
+                # 檢查數據
+                if (any(is.na(data)) || any(is.infinite(as.matrix(data)))) {
+                    stop("Data contains NA or Infinite values")
+                }
                 
-                sim <- ugarchsim(fit, n.sim = n_sim)
-                vol <- sigma(sim)
+                # 1. 先擬合單變量 GARCH
+                uspec = multispec(
+                    replicate(n_series,
+                        ugarchspec(
+                            mean.model = list(armaOrder = c(0,0), include.mean = FALSE),
+                            variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+                            distribution.model = "norm",
+                            fixed.pars = list()
+                        )
+                    )
+                )
                 
-                # 確保返回合理的值
-                vol[is.na(vol)] <- mean(vol, na.rm = TRUE)
-                vol[vol <= 0] <- mean(vol[vol > 0])
+                print("Fitting univariate models...")
+                fit.uni = multifit(uspec, data, fit.control = list(scale = TRUE))
                 
-                return(as.numeric(vol))
+                # 2. 創建 DCC 規格
+                dccspec = dccspec(
+                    uspec = uspec, 
+                    dccOrder = c(1,1),
+                    distribution = "mvnorm",
+                    model = "DCC"
+                )
+                
+                print("Fitting DCC model...")
+                # 3. 使用更穩定的設定擬合 DCC
+                fit = dccfit(
+                    dccspec, 
+                    data = data, 
+                    fit.control = list(
+                        scale = TRUE,
+                        eval.se = TRUE
+                    ),
+                    solver = "solnp",
+                    solver.control = list(
+                        trace = TRUE,
+                        tol = 1e-8,
+                        delta = 1e-7,
+                        max.major = 1000,
+                        max.minor = 1000
+                    )
+                )
+                
+                if (is.null(fit)) {
+                    stop("DCC fitting returned NULL")
+                }
+                
+                print("DCC fitting completed")
+                return(fit)
+                
             }, error = function(e) {
-                # 如果模型擬合失敗，使用簡單的移動標準差
-                e
-                sd <- sd(data[,1], na.rm = TRUE)
-                return(rep(sd, n_sim))
+                print(paste("Error in fitting:", e$message))
+                return(NULL)
             })
         }
         """
         
-        try:
-            r_func = robjects.r(r_code)
-            errors = np.array(r_func(r_data, n_sim))
+        # 創建 R 函數並執行
+        r_fit_dcc = ro.r(r_code)
+        self.dcc_fit = r_fit_dcc(r_residuals, self.n_series)
+        
+        # 檢查擬合結果
+        if self.dcc_fit is None:
+            raise Exception("DCC-GARCH model fitting failed")
+
+    def simulate_dcc_garch(self, n_ahead: int) -> np.ndarray:
+        """使用擬合的 DCC-GARCH 模型生成模擬數據"""
+        if self.dcc_fit is None:
+            raise Exception("No fitted DCC-GARCH model available")
             
-            # 確保誤差項是合理的
-            if np.any(np.isnan(errors)):
-                print("警告: 發現 NaN 值，使用均值替代")
-                errors = np.nan_to_num(errors, nan=np.nanmean(errors))
+        r_code = """
+        function(fit, n_ahead) {
+            tryCatch({
+                print("Starting simulation...")
+                sim = dccsim(fit, n.sim = n_ahead, n.start = 0)
+                if (is.null(sim)) {
+                    stop("Simulation returned NULL")
+                }
+                print("Simulation completed")
+                return(fitted(sim))
+            }, error = function(e) {
+                print(paste("Error in simulation:", e$message))
+                return(NULL)
+            })
+        }
+        """
+        
+        r_simulate = ro.r(r_code)
+        sim_result = r_simulate(self.dcc_fit, n_ahead)
+        
+        if sim_result is None:
+            raise Exception("DCC-GARCH simulation failed")
             
-            # 標準化誤差項
-            errors = errors / np.std(errors) * np.std(data)
+        return np.array(sim_result)
+        
+    def simulate_dcc_garch(self, n_ahead: int) -> np.ndarray:
+        """
+        使用擬合的 DCC-GARCH 模型生成模擬數據
+        
+        Parameters:
+        -----------
+        n_ahead : int
+            預測期數
             
-            return errors.flatten()
-            
-        except Exception as e:
-            print(f"GARCH 模型執行錯誤: {str(e)}")
-            return np.random.normal(0, np.std(data), n_sim)
+        Returns:
+        --------
+        np.ndarray
+            模擬的殘差
+        """
+        # R 代碼：執行模擬
+        r_code = """
+        function(fit, n_ahead) {
+            sim = dccsim(fit, n.sim = n_ahead)
+            return(fitted(sim))
+        }
+        """
+        
+        r_simulate = ro.r(r_code)
+        simulated_residuals = np.array(r_simulate(self.dcc_fit, n_ahead))
+        
+        return simulated_residuals
     
-    def plot_components(self, col, forecast, errors):
-        """繪製並保存組件分解圖"""
-        plt.style.use('default')
+    def simulate(self, n_ahead: int, seed: Optional[int] = None) -> pd.DataFrame:
+        """
+        生成完整的模擬數據
         
-        # 創建子圖
-        fig, axes = plt.subplots(4, 1, figsize=(15, 20))
-        fig.suptitle(f'{self.args.stock} {col}', fontsize=16, y=0.95)
+        Parameters:
+        -----------
+        n_ahead : int
+            預測期數
+        seed : int, optional
+            隨機種子
+            
+        Returns:
+        --------
+        pd.DataFrame
+            模擬的時間序列數據
+        """
+        if seed is not None:
+            np.random.seed(seed)
+            ro.r('set.seed')(seed)
+            
+        # 生成未來日期
+        future_dates = pd.date_range(
+            start=self.data.index[-1] + timedelta(days=1),
+            periods=n_ahead,
+            freq='B'  # 營業日
+        )
         
-        # 1. 趨勢圖
-        axes[0].plot(forecast['ds'], forecast['trend'], 'b-', linewidth=2)
-        axes[0].set_title('Trend')
-        axes[0].set_xlabel('Date')
-        axes[0].set_ylabel('Value')
-        axes[0].grid(True)
+        # 儲存模擬結果
+        simulated_data = pd.DataFrame(index=future_dates, columns=self.data.columns)
+        future_df = pd.DataFrame({'ds': future_dates})
         
-        # 2. 年度季節性
-        axes[1].plot(forecast['ds'], forecast['yearly'], 'g-', linewidth=2)
-        axes[1].set_title('Yearly seasonal')
-        axes[1].set_xlabel('Date')
-        axes[1].set_ylabel('Value')
-        axes[1].grid(True)
+        # 使用 DCC-GARCH 模擬殘差
+        simulated_residuals = self.simulate_dcc_garch(n_ahead)
         
-        # 3. 日內季節性
-        axes[2].plot(forecast['ds'], forecast['daily'], 'r-', linewidth=2)
-        axes[2].set_title('Daily seasonal')
-        axes[2].set_xlabel('Date')
-        axes[2].set_ylabel('Value')
-        axes[2].grid(True)
+        # 對每個序列進行預測
+        for i, col in enumerate(self.data.columns):
+            # Prophet 預測趨勢和季節性
+            forecast = self.prophet_models[col].predict(future_df)
+            trend = forecast['trend'].values
+            seasonal = (forecast['yearly'] + forecast['weekly']).values
+            
+            # 組合所有組件
+            simulated_data[col] = trend + seasonal + simulated_residuals[:, i]
         
-        # 4. 誤差項
-        axes[3].plot(forecast['ds'], errors, 'k-', linewidth=2)
-        axes[3].set_title('GARCH error')
-        axes[3].set_xlabel('Date')
-        axes[3].set_ylabel('value')
-        axes[3].grid(True)
+        return simulated_data
+    
+    def validate_correlation(self, simulated_data: pd.DataFrame) -> None:
+        """驗證原始數據和模擬數據的相關性結構"""
+        # 計算原始數據的相關係數
+        original_corr = self.data.corr()
+        
+        # 計算模擬數據的相關係數
+        simulated_corr = simulated_data.corr()
+        
+        # 繪製熱圖比較
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        im1 = ax1.imshow(original_corr)
+        ax1.set_title('Original Correlation')
+        plt.colorbar(im1, ax=ax1)
+        
+        im2 = ax2.imshow(simulated_corr)
+        ax2.set_title('Simulated Correlation')
+        plt.colorbar(im2, ax=ax2)
+        
+        # 設置標籤
+        for ax in [ax1, ax2]:
+            ax.set_xticks(range(len(self.data.columns)))
+            ax.set_yticks(range(len(self.data.columns)))
+            ax.set_xticklabels(self.data.columns, rotation=45)
+            ax.set_yticklabels(self.data.columns)
         
         plt.tight_layout()
-        plt.savefig(f'{self.img_path}/{col}_components.png')
-        plt.close()
+        plt.savefig(f'./img/simulate/{args.stock}/corr.png')
+        
+        # 印出相關係數的差異
+        diff = original_corr - simulated_corr
+        print("\nCorrelation Difference (Original - Simulated):")
+        print(diff)
     
-    def simulate_price_series(self, col):
-        """模擬單一價格序列"""
-        print(f"模擬 {col} 序列...")
+    def plot_simulation(self, simulated_data: pd.DataFrame) -> None:
+        """
+        繪製原始數據和模擬數據的比較圖
         
-        # 準備數據
-        prophet_data = self.df[['ts', col]].copy()
-        prophet_data.columns = ['ds', 'y']
+        Parameters:
+        -----------
+        simulated_data : pd.DataFrame
+            模擬的數據
+        """
+        n_cols = len(self.data.columns)
+        fig, axes = plt.subplots(n_cols, 1, figsize=(12, 4*n_cols))
         
-        # 使用對數轉換處理價格數據
-        if col not in ['Volume', 'Amount']:
-            prophet_data['y'] = np.log(prophet_data['y'])
+        if n_cols == 1:
+            axes = [axes]
+            
+        for i, col in enumerate(self.data.columns):
+            # 繪製原始數據
+            axes[i].plot(self.data.index, self.data[col], 
+                        label='Historical', color='blue')
+            
+            # 繪製模擬數據
+            axes[i].plot(simulated_data.index, simulated_data[col], 
+                        label='Simulated', color='red', linestyle='--')
+            
+            axes[i].set_title(f'{col} - Historical vs Simulated')
+            axes[i].legend()
+            axes[i].grid(True)
         
-        # Prophet模型設置
-        model = Prophet(
-            interval_width=0.95,
-            yearly_seasonality=True,
-            weekly_seasonality=True,
-            daily_seasonality=True,
-            seasonality_mode='multiplicative',
-            changepoint_prior_scale=0.05  # 降低以減少過擬合
-        )
-        model.fit(prophet_data)
+        plt.tight_layout()
+        plt.savefig(f'./img/simulate/{args.stock}/compare.png')
+
+    def plot_decomposition(self, col: str = None) -> None:
+        """
+        視覺化 Prophet 分解的趨勢和季節性成分
         
-        # 生成未來時間序列
-        future = self.create_trading_future_df(model)
-        forecast = model.predict(future)
-        
-        # 生成考慮自相關的誤差項
-        errors = self.generate_correlated_errors(
-            prophet_data['y'], 
-            len(future), 
-            self.stats[col]['autocorr'] if col in ['Volume', 'Amount'] else self.stats[f'{col}_returns']['autocorr']
-        )
-        
-        # 合成序列
-        simulated = (forecast['trend'].values + 
-                    forecast['yearly'].values + 
-                    forecast['weekly'].values + 
-                    forecast['daily'].values + 
-                    errors)
-        
-        # 如果是價格數據，需要轉換回原始尺度
-        if col not in ['Volume', 'Amount']:
-            simulated = np.exp(simulated)
-            # 應用波動率約束
-            simulated = self.apply_volatility_constraints(simulated)
+        Parameters:
+        -----------
+        col : str, optional
+            指定要繪製的列名，若為 None 則繪製所有列
+        """
+        if col is not None:
+            columns = [col]
         else:
-            # 對Volume和Amount使用正態化處理
-            simulated = stats.norm.cdf(simulated)  # 轉換到[0,1]區間
-            # 映射到原始數據的範圍
-            simulated = (self.stats[col]['q99'] - self.stats[col]['q01']) * simulated + self.stats[col]['q01']
-        
-        self.plot_components(col, forecast, errors)
-        
-        return simulated
-    
-    def generate_correlated_errors(self, data, n_sim, autocorr):
-        """生成具有自相關性的誤差項"""
-        # 使用AR(1)過程生成具有自相關的誤差
-        errors = np.zeros(n_sim)
-        errors[0] = np.random.normal(0, np.std(data))
-        
-        for i in range(1, n_sim):
-            errors[i] = autocorr * errors[i-1] + np.random.normal(0, np.std(data) * np.sqrt(1 - autocorr**2))
-        
-        return errors
-    
-    def simulate_all(self):
-        """模擬所有價格序列"""
-        raw_simulated = pd.DataFrame()
-        raw_simulated['ts'] = self.df['ts']
-
-        for col in self.cols:
-            raw_simulated[col] = self.simulate_price_series(col)
-        
-        # 調整數據以符合邏輯約束
-        adjusted_data = self.adjust_price_series(raw_simulated)
-        
-        # 驗證數據合理性
-        self.validate_data(adjusted_data)
-        
-        # 保存模擬數據
-        adjusted_data.to_csv(f'{self.save_path}/simulated_prices.csv', index=False)
-        print("模擬完成！")
-        
-        return adjusted_data
-    
-    def plot_comparison(self, simulated_data):
-        """繪製原始數據和模擬數據的比較圖"""
-        plt.style.use('default')
-        
-        for col in self.cols:
-            plt.figure(figsize=(15, 8))
-            plt.plot(self.df['ts'], self.df[col], 'b-', label='raw data', alpha=0.6)
-            plt.plot(simulated_data['ts'], simulated_data[col], 'r-', label='simulated', alpha=0.6)
-            plt.title(f'{self.args.stock} {col} original v.s. simulated data')
-            plt.xlabel('Time')
-            plt.ylabel('Value')
-            plt.legend()
-            plt.grid(True)
+            columns = self.data.columns
+            
+        for col in columns:
+            # 創建包含4個子圖的圖表
+            fig, axes = plt.subplots(4, 1, figsize=(15, 20))
+            
+            # 繪製原始數據
+            axes[0].plot(self.data.index, self.data[col], label='Original Data', color='blue')
+            axes[0].set_title(f'{col} - Original Time Series')
+            axes[0].grid(True)
+            axes[0].legend()
+            
+            # 繪製趨勢
+            axes[1].plot(self.data.index, self.decomposition[col]['trend'], 
+                        label='Trend', color='red')
+            axes[1].set_title(f'{col} - Trend Component')
+            axes[1].grid(True)
+            axes[1].legend()
+            
+            # 繪製季節性
+            axes[2].plot(self.data.index, self.decomposition[col]['seasonal'], 
+                        label='Seasonal', color='green')
+            axes[2].set_title(f'{col} - Seasonal Component')
+            axes[2].grid(True)
+            axes[2].legend()
+            
+            # 繪製殘差
+            axes[3].plot(self.data.index, self.decomposition[col]['residuals'], 
+                        label='Residuals', color='purple')
+            axes[3].set_title(f'{col} - Residuals')
+            axes[3].grid(True)
+            axes[3].legend()
+            
+            # 調整布局
             plt.tight_layout()
-            plt.savefig(f'{self.img_path}/{col}_comparison.png')
+            
+            # 儲存圖片
+            plt.savefig(f'./img/simulate/{args.stock}/decomposition_{col}.png')
             plt.close()
-            
-    def validate_data(self, data):
-        """驗證數據是否符合邏輯約束和統計特性"""
-        issues = []
-        
-        # 檢查基本邏輯約束
-        if not all(data['High'] >= data['Open']):
-            issues.append("發現High小於Open的情況")
-        if not all(data['High'] >= data['Close']):
-            issues.append("發現High小於Close的情況")
-        if not all(data['Low'] <= data['Open']):
-            issues.append("發現Low大於Open的情況")
-        if not all(data['Low'] <= data['Close']):
-            issues.append("發現Low大於Close的情況")
-        
-        # 檢查數值範圍
-        for col in self.cols:
-            if data[col].min() < self.stats[col]['q01']:
-                issues.append(f"{col}出現異常低值")
-            if data[col].max() > self.stats[col]['q99']:
-                issues.append(f"{col}出現異常高值")
-        
-        # 檢查自相關性
-        for col in self.cols:
-            sim_autocorr = data[col].autocorr()
-            orig_autocorr = self.stats[col]['autocorr']
-            if abs(sim_autocorr - orig_autocorr) > 0.3:
-                issues.append(f"{col}的自相關性與原始數據差異過大")
-        
-        # 報告問題
-        if issues:
-            print("警告: 發現以下數據問題:")
-            for issue in issues:
-                print(f"- {issue}")
 
-    def adjust_price_series(self, simulated_data):
-        """調整價格序列以符合邏輯約束"""
-        adjusted = pd.DataFrame()
-        adjusted['ts'] = simulated_data['ts']
+    def plot_seasonal_components(self, col: str = None) -> None:
+        """
+        單獨視覺化週季節性和年季節性成分
         
-        # 使用移動平均平滑Close價格
-        window = 5
-        adjusted['Close'] = pd.Series(simulated_data['Close']).rolling(window=window, min_periods=1).mean()
-        
-        # 根據歷史關係生成其他價格
-        for t in range(len(adjusted)):
-            # 生成符合自相關的價格範圍
-            high_dev = self.stats['price_relations']['high_deviation']
-            low_dev = self.stats['price_relations']['low_deviation']
+        Parameters:
+        -----------
+        col : str, optional
+            指定要繪製的列名，若為 None 則繪製所有列
+        """
+        if col is not None:
+            columns = [col]
+        else:
+            columns = self.data.columns
             
-            if t > 0:
-                # 考慮前一時刻的價格
-                prev_high = adjusted['High'].iloc[t-1]
-                prev_low = adjusted['Low'].iloc[t-1]
-                current_close = adjusted['Close'].iloc[t]
-                
-                # 使用加權平均生成新的high/low
-                weight = 0.7  # 控制連續性的權重
-                high_range = weight * prev_high + (1-weight) * (current_close * (1 + high_dev))
-                low_range = weight * prev_low + (1-weight) * (current_close * (1 - low_dev))
-            else:
-                # 第一個時刻
-                current_close = adjusted['Close'].iloc[t]
-                high_range = current_close * (1 + high_dev)
-                low_range = current_close * (1 - low_dev)
+        for col in columns:
+            # 獲取 Prophet 模型
+            model = self.prophet_models[col]
             
-            # 確保價格邏輯
-            adjusted.loc[t, 'High'] = max(high_range, adjusted['Close'].iloc[t])
-            adjusted.loc[t, 'Low'] = min(low_range, adjusted['Close'].iloc[t])
+            # 生成完整預測，包含季節性成分
+            df = pd.DataFrame({'ds': self.data.index})
+            forecast = model.predict(df)
             
-            # 生成Open價格
-            if t > 0:
-                # 考慮前一個Close價格
-                prev_close = adjusted['Close'].iloc[t-1]
-                open_weight = 0.3
-                adjusted.loc[t, 'Open'] = (open_weight * prev_close + 
-                                         (1-open_weight) * (adjusted['Low'].iloc[t] + 
-                                         np.random.uniform(0, 1) * (adjusted['High'].iloc[t] - adjusted['Low'].iloc[t])))
-            else:
-                adjusted.loc[t, 'Open'] = adjusted['Low'].iloc[t] + np.random.uniform(0, 1) * (adjusted['High'].iloc[t] - adjusted['Low'].iloc[t])
+            # 創建包含2個子圖的圖表
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10))
+            
+            # 繪製週季節性
+            week_seasonal = forecast['weekly'].values
+            week_days = pd.date_range(start='2024-01-01', periods=len(week_seasonal), freq='D')
+            ax1.plot(week_days[:7], week_seasonal[:7], color='blue', marker='o')
+            ax1.set_title(f'{col} - Weekly Seasonality')
+            ax1.set_xlabel('Day of Week')
+            ax1.set_xticklabels(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+            ax1.grid(True)
+            
+            # 繪製年季節性
+            year_seasonal = forecast['yearly'].values
+            year_days = pd.date_range(start='2024-01-01', periods=len(year_seasonal), freq='D')
+            ax2.plot(year_days[:365], year_seasonal[:365], color='green')
+            ax2.set_title(f'{col} - Yearly Seasonality')
+            ax2.set_xlabel('Month')
+            ax2.set_xticks([year_days[0] + pd.DateOffset(months=i) for i in range(12)])
+            ax2.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+            ax2.grid(True)
+            
+            # 調整布局
+            plt.tight_layout()
+            
+            # 儲存圖片
+            plt.savefig(f'./img/simulate/{args.stock}/seasonality_{col}.png')
+            plt.close()
+
+    def plot_all_components(self) -> None:
+        """
+        繪製所有變數的分解圖和季節性圖
+        """
+        # 檢查圖片保存目錄是否存在
+        import os
+        os.makedirs(f'./img/simulate/{args.stock}', exist_ok=True)
         
-        # 處理Volume和Amount
-        adjusted['Volume'] = simulated_data['Volume']
+        # 繪製所有分解圖
+        self.plot_decomposition()
         
-        # 根據價格調整Amount
-        mid_price = (adjusted['Open'] + adjusted['Close']) / 2
-        adjusted['Amount'] = adjusted['Volume'] * mid_price * self.stats['price_relations']['volume_price_ratio']
-        
-        return adjusted
+        # 繪製所有季節性圖
+        self.plot_seasonal_components()
 
 if __name__ == '__main__':
-    # 設置參數
+    # 初始化模擬器
     args = parse_args()
     args.mode = 'simulate'
-    
-    # 創建模擬器實例
-    simulator = StockSimulator(args)
-    
-    # 執行模擬
-    simulated_data = simulator.simulate_all()
-    
-    # 繪製比較圖
-    simulator.plot_comparison(simulated_data)
+    processor = DataProcessor(args)
+    data = processor.get_data()
+
+    simulator = DCCGARCHSimulator(data)
+
+    # 進行分解和擬合
+    simulator.decompose_series()
+    simulator.plot_all_components()
+    simulator.fit_dcc_garch()
+
+    # 生成模擬數據
+    n_ahead = 365  # 模擬一年的交易日數據
+    simulated_data = simulator.simulate(n_ahead, seed=42)
+    simulated_data.to_csv(f'./data/simulated/{args.stock}_simulated.csv')
+    # 驗證結果
+    simulator.validate_correlation(simulated_data)
+    simulator.plot_simulation(simulated_data)
