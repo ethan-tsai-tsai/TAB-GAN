@@ -14,12 +14,12 @@ class DataProcessor:
         self.args = args
         self.trial = trial
         print('Processing data ......')
-        self.start_time = datetime.now()
+        start_time = datetime.now()
         
         # 創建資料夾
         path = f'./data/{args.stock}'
         if not os.path.exists(path): os.makedirs(path)
-        else: clear_folder(path)
+        
         # 初始化數據
         self._initialize_data()
         
@@ -29,10 +29,22 @@ class DataProcessor:
         else:
             self._process_training_data()
             
-        print(f'Data processing spent {(datetime.now() - self.start_time).total_seconds(): 2f} seconds')
+        print(f'Data processing spent {(datetime.now() - start_time).total_seconds(): 2f} seconds')
+    
+    
+    def _clear_previous_data(self):
+        """清理前一個 trial 的資料和變數"""
+        # 清理所有實例變數
+        for attr in list(self.__dict__.keys()):
+            if attr not in ['args', 'trial']:
+                delattr(self, attr)
     
     def _initialize_data(self):
         """初始化基本數據處理"""
+        
+        # 清理任何可能的類別變數
+        self._clear_previous_data()
+        
         # load data
         self.data = pd.read_csv(f'./data/{self.args.stock}.csv').sort_values(by='ts')
         
@@ -59,6 +71,7 @@ class DataProcessor:
     
     def _process_training_data(self):
         """處理訓練模式的數據"""
+        
         # 加入技術指標
         self._add_technical_indicators()
         

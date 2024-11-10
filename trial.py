@@ -5,6 +5,15 @@ from subprocess import Popen, PIPE
 from arguments import parse_args
 from preprocessor import *
 
+def verify_data(args, trial):
+    """驗證當前 trial 的資料是否正確"""
+    train_data = pd.read_csv(f'./data/{args.stock}/train.csv', index_col='ts')
+    test_data = pd.read_csv(f'./data/{args.stock}/test.csv', index_col='ts')
+    
+    print(f"\nTrial {trial} 資料驗證:")
+    print(f"訓練資料範圍: {train_data.index[0]} to {train_data.index[-1]}")
+    print(f"測試資料範圍: {test_data.index[0]} to {test_data.index[-1]}")
+
 def run_trial(args, trial):
     print(f"\n{'='*50}")
     print(f"Trial {trial}")
@@ -13,6 +22,7 @@ def run_trial(args, trial):
    
    # get trial data
     _ = DataProcessor(args, trial)
+    verify_data(args, trial)
     
     # set up variables
     args.name = f'trial_{trial}'

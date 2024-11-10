@@ -4,6 +4,7 @@ import pandas as pd
 from prophet import Prophet
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy import stats
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
@@ -46,7 +47,68 @@ class StockSimulator:
         self.df = processor.get_data()
         self.df['ts'] = self.df.index
         self.cols = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount']
+        
+        # 計算各欄位的統計特性
+        self.calc_data_statistics()
     
+    def calc_data_statistics(self):
+        """計算原始數據的統計特性"""
+        self.stats = {}
+        
+        for col in self.cols:
+            self.stats[col] = {
+                'mean': self.df[col].mean(),
+                'std': self.df[col].std(),
+                'min': self.df[col].min(),
+                'max': self.df[col].max(),
+                'q01': self.df[col].quantile(0.01),
+                'q99': self.df[col].quantile(0.99),
+                'autocorr': self.df[col].autocorr()
+            }
+            
+            # 計算對數收益率的統計特性
+            if col != 'Volume' and col != 'Amount':
+                returns = np.log(self.df[col]).diff()
+                self.stats[f'{col}_returns'] = {
+                    'mean': returns.mean(),
+                    'std': returns.std(),
+                    'autocorr': returns.autocorr()
+                }
+        
+        # 計算價格之間的相對關係
+        self.calc_price_relations()
+    
+    def calc_price_relations(self):
+        """計算價格之間的關係統計"""
+        # 計算High/Low相對於中間價格的偏離程度
+        mid_price = (self.df['Open'] + self.df['Close']) / 2
+        self.stats['price_relations'] = {
+            'high_deviation': ((self.df['High'] - mid_price) / mid_price).mean(),
+            'low_deviation': ((mid_price - self.df['Low']) / mid_price).mean(),
+            'volume_price_ratio': (self.df['Volume'] * self.df['Close'] / self.df['Amount']).median()
+        }
+    
+    def apply_volatility_constraints(self, simulated):
+        """應用波動率約束"""
+        # 使用移動窗口計算歷史波動率
+        window = 20
+        hist_vol = self.df['Close'].pct_change().rolling(window).std()
+        avg_vol = hist_vol.mean()
+        max_vol = hist_vol.quantile(0.99)
+        
+        # 限制模擬數據的波動率
+        returns = pd.Series(simulated).pct_change()
+        rolling_vol = returns.rolling(window).std()
+        
+        # 如果波動率超過限制，進行調整
+        scale_factor = np.minimum(1, max_vol / rolling_vol)
+        adjusted_returns = returns * scale_factor
+        
+        # 轉換回價格序列
+        adjusted_price = np.exp(np.log(simulated[0]) + np.cumsum(adjusted_returns))
+        
+        return adjusted_price
+        
     def create_trading_future_df(self, model):
         """生成交易日的未來時間序列"""
         periods = self.trading_days * 9
@@ -186,50 +248,84 @@ class StockSimulator:
         prophet_data = self.df[['ts', col]].copy()
         prophet_data.columns = ['ds', 'y']
         
-        # 建立和擬合 Prophet 模型
+        # 使用對數轉換處理價格數據
+        if col not in ['Volume', 'Amount']:
+            prophet_data['y'] = np.log(prophet_data['y'])
+        
+        # Prophet模型設置
         model = Prophet(
             interval_width=0.95,
             yearly_seasonality=True,
             weekly_seasonality=True,
             daily_seasonality=True,
-            seasonality_mode='multiplicative'
+            seasonality_mode='multiplicative',
+            changepoint_prior_scale=0.05  # 降低以減少過擬合
         )
         model.fit(prophet_data)
         
         # 生成未來時間序列
         future = self.create_trading_future_df(model)
-        
-        # 預測趨勢和季節性
         forecast = model.predict(future)
         
-        # 生成誤差項
-        errors = self.generate_garch_errors(prophet_data['y'], len(future))
+        # 生成考慮自相關的誤差項
+        errors = self.generate_correlated_errors(
+            prophet_data['y'], 
+            len(future), 
+            self.stats[col]['autocorr'] if col in ['Volume', 'Amount'] else self.stats[f'{col}_returns']['autocorr']
+        )
         
-        # 繪製組件分解圖
-        self.plot_components(col, forecast, errors)
-        
-        # 合成最終序列
+        # 合成序列
         simulated = (forecast['trend'].values + 
                     forecast['yearly'].values + 
                     forecast['weekly'].values + 
                     forecast['daily'].values + 
-                    errors.flatten())
+                    errors)
+        
+        # 如果是價格數據，需要轉換回原始尺度
+        if col not in ['Volume', 'Amount']:
+            simulated = np.exp(simulated)
+            # 應用波動率約束
+            simulated = self.apply_volatility_constraints(simulated)
+        else:
+            # 對Volume和Amount使用正態化處理
+            simulated = stats.norm.cdf(simulated)  # 轉換到[0,1]區間
+            # 映射到原始數據的範圍
+            simulated = (self.stats[col]['q99'] - self.stats[col]['q01']) * simulated + self.stats[col]['q01']
+        
+        self.plot_components(col, forecast, errors)
         
         return simulated
     
+    def generate_correlated_errors(self, data, n_sim, autocorr):
+        """生成具有自相關性的誤差項"""
+        # 使用AR(1)過程生成具有自相關的誤差
+        errors = np.zeros(n_sim)
+        errors[0] = np.random.normal(0, np.std(data))
+        
+        for i in range(1, n_sim):
+            errors[i] = autocorr * errors[i-1] + np.random.normal(0, np.std(data) * np.sqrt(1 - autocorr**2))
+        
+        return errors
+    
     def simulate_all(self):
         """模擬所有價格序列"""
-        simulated_data = pd.DataFrame()
-        simulated_data['ts'] = self.df['ts']
+        raw_simulated = pd.DataFrame()
+        raw_simulated['ts'] = self.df['ts']
 
         for col in self.cols:
-            simulated_data[col] = self.simulate_price_series(col)
+            raw_simulated[col] = self.simulate_price_series(col)
+        
+        # 調整數據以符合邏輯約束
+        adjusted_data = self.adjust_price_series(raw_simulated)
+        
+        # 驗證數據合理性
+        self.validate_data(adjusted_data)
         
         # 保存模擬數據
-        simulated_data.to_csv(f'{self.save_path}/simulated_prices.csv', index=False)
+        adjusted_data.to_csv(f'{self.save_path}/simulated_prices.csv', index=False)
         print("模擬完成！")
         
-        return simulated_data
+        return adjusted_data
     
     def plot_comparison(self, simulated_data):
         """繪製原始數據和模擬數據的比較圖"""
@@ -247,6 +343,95 @@ class StockSimulator:
             plt.tight_layout()
             plt.savefig(f'{self.img_path}/{col}_comparison.png')
             plt.close()
+            
+    def validate_data(self, data):
+        """驗證數據是否符合邏輯約束和統計特性"""
+        issues = []
+        
+        # 檢查基本邏輯約束
+        if not all(data['High'] >= data['Open']):
+            issues.append("發現High小於Open的情況")
+        if not all(data['High'] >= data['Close']):
+            issues.append("發現High小於Close的情況")
+        if not all(data['Low'] <= data['Open']):
+            issues.append("發現Low大於Open的情況")
+        if not all(data['Low'] <= data['Close']):
+            issues.append("發現Low大於Close的情況")
+        
+        # 檢查數值範圍
+        for col in self.cols:
+            if data[col].min() < self.stats[col]['q01']:
+                issues.append(f"{col}出現異常低值")
+            if data[col].max() > self.stats[col]['q99']:
+                issues.append(f"{col}出現異常高值")
+        
+        # 檢查自相關性
+        for col in self.cols:
+            sim_autocorr = data[col].autocorr()
+            orig_autocorr = self.stats[col]['autocorr']
+            if abs(sim_autocorr - orig_autocorr) > 0.3:
+                issues.append(f"{col}的自相關性與原始數據差異過大")
+        
+        # 報告問題
+        if issues:
+            print("警告: 發現以下數據問題:")
+            for issue in issues:
+                print(f"- {issue}")
+
+    def adjust_price_series(self, simulated_data):
+        """調整價格序列以符合邏輯約束"""
+        adjusted = pd.DataFrame()
+        adjusted['ts'] = simulated_data['ts']
+        
+        # 使用移動平均平滑Close價格
+        window = 5
+        adjusted['Close'] = pd.Series(simulated_data['Close']).rolling(window=window, min_periods=1).mean()
+        
+        # 根據歷史關係生成其他價格
+        for t in range(len(adjusted)):
+            # 生成符合自相關的價格範圍
+            high_dev = self.stats['price_relations']['high_deviation']
+            low_dev = self.stats['price_relations']['low_deviation']
+            
+            if t > 0:
+                # 考慮前一時刻的價格
+                prev_high = adjusted['High'].iloc[t-1]
+                prev_low = adjusted['Low'].iloc[t-1]
+                current_close = adjusted['Close'].iloc[t]
+                
+                # 使用加權平均生成新的high/low
+                weight = 0.7  # 控制連續性的權重
+                high_range = weight * prev_high + (1-weight) * (current_close * (1 + high_dev))
+                low_range = weight * prev_low + (1-weight) * (current_close * (1 - low_dev))
+            else:
+                # 第一個時刻
+                current_close = adjusted['Close'].iloc[t]
+                high_range = current_close * (1 + high_dev)
+                low_range = current_close * (1 - low_dev)
+            
+            # 確保價格邏輯
+            adjusted.loc[t, 'High'] = max(high_range, adjusted['Close'].iloc[t])
+            adjusted.loc[t, 'Low'] = min(low_range, adjusted['Close'].iloc[t])
+            
+            # 生成Open價格
+            if t > 0:
+                # 考慮前一個Close價格
+                prev_close = adjusted['Close'].iloc[t-1]
+                open_weight = 0.3
+                adjusted.loc[t, 'Open'] = (open_weight * prev_close + 
+                                         (1-open_weight) * (adjusted['Low'].iloc[t] + 
+                                         np.random.uniform(0, 1) * (adjusted['High'].iloc[t] - adjusted['Low'].iloc[t])))
+            else:
+                adjusted.loc[t, 'Open'] = adjusted['Low'].iloc[t] + np.random.uniform(0, 1) * (adjusted['High'].iloc[t] - adjusted['Low'].iloc[t])
+        
+        # 處理Volume和Amount
+        adjusted['Volume'] = simulated_data['Volume']
+        
+        # 根據價格調整Amount
+        mid_price = (adjusted['Open'] + adjusted['Close']) / 2
+        adjusted['Amount'] = adjusted['Volume'] * mid_price * self.stats['price_relations']['volume_price_ratio']
+        
+        return adjusted
 
 if __name__ == '__main__':
     # 設置參數
