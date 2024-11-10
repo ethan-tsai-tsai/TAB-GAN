@@ -15,15 +15,15 @@ def run_trial(args, trial):
     _ = DataProcessor(args, trial)
     
     # set up variables
-    name = f'trial_{trial}'
-    
+    args.name = f'trial_{trial}'
+
     for script in scripts:
         print(f"執行 {script}")
         
         try:
             # 使用 Popen 即時顯示輸出
             process = Popen(
-                [sys.executable, script, '--name', name],
+                [sys.executable, script, '--stock', args.stock, '--name', args.name, '--cuda', str(args.cuda)],
                 stdout=PIPE,
                 stderr=PIPE,
                 bufsize=1,

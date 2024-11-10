@@ -110,7 +110,7 @@ class generator(nn.Module):
         for i in range(len(self.gru_list)):
             h0 = torch.zeros(2, cond.size(0), self.hidden_layer_size[i]).to(self.device)
             cond, _ = self.gru_list[i](cond, h0)
-            cond = self.dropout(cond)
+            cond = self.dropout(cond) if i != len(self.gru_list) - 1 else cond
         
         cond = self.position_encoding(cond)
         

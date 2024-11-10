@@ -44,8 +44,8 @@ def objective(trial):
         _ = wgan_model.train(train_loader, val_loader)
         _, _, test_kld, test_fid = wgan_model.validation(test_loader)
         _, _, val_kld, val_fid = wgan_model.validation(val_loader)
-        test_score = test_kld# + test_fid
-        val_score = val_kld# + val_fid
+        test_score = test_kld
+        val_score = val_kld
         alpha = 0.7
         score = alpha * test_score + (1 - alpha) * val_score
         return score

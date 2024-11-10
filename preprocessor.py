@@ -19,7 +19,7 @@ class DataProcessor:
         # 創建資料夾
         path = f'./data/{args.stock}'
         if not os.path.exists(path): os.makedirs(path)
-        
+        else: clear_folder(path)
         # 初始化數據
         self._initialize_data()
         
@@ -198,4 +198,4 @@ class StockDataset(Dataset):
 
 if __name__ == '__main__':
     args = parse_args()
-    data_processor = DataProcessor(args)
+    data_processor = DataProcessor(args, trial=2)

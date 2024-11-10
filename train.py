@@ -107,8 +107,9 @@ class wgan:
             results['test_kld'].append(kld)
             
             if (epoch+1)%(self.args.epoch//10)==0:
-                if self.args.mode == 'train': self.validation_plot(val_datasets, f'Epoch{epoch + 1}_chart')
-                print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
+                if self.args.mode == 'train':
+                    self.validation_plot(val_datasets, f'Epoch{epoch + 1}_chart')
+                    print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
                 
         return results
     
