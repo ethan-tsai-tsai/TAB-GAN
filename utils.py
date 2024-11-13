@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import numpy as np
+from typing import Tuple, List, Dict
 from datetime import datetime, timedelta
 from scipy.linalg import sqrtm
 from scipy.special import rel_entr
@@ -460,3 +461,161 @@ class TechnicalIndicators:
             data[f'{window}lower'] = lower
         
         return data
+
+class TradingStrategy:
+    def __init__(self, confidence_level: float = 90.0, risk_free_rate: float = 0.02):
+        """
+        初始化交易策略
+        
+        Args:
+            confidence_level (float): 信賴區間百分比 (例如90表示90%信賴區間)
+            risk_free_rate (float): 無風險利率，用於計算夏普率
+        """
+        self.confidence_level = confidence_level
+        self.risk_free_rate = risk_free_rate
+        self.signals = []
+        self.positions = []
+        self.returns = []
+        
+    def calculate_bounds(self, predictions: np.ndarray) -> Tuple[float, float]:
+        """
+        計算預測值的上下界
+        
+        Args:
+            predictions (np.ndarray): 某時間點的多次預測值
+            
+        Returns:
+            Tuple[float, float]: (下界, 上界)
+        """
+        lower_percentile = (100 - self.confidence_level) / 2
+        upper_percentile = 100 - lower_percentile
+        
+        lower_bound = np.percentile(predictions, lower_percentile)
+        upper_bound = np.percentile(predictions, upper_percentile)
+        
+        return lower_bound, upper_bound
+    
+    def generate_signals(self, actual_prices: np.ndarray, predictions: np.ndarray) -> Dict:
+        """
+        根據實際價格和預測生成交易訊號
+        
+        Args:
+            actual_prices (np.ndarray): 實際價格序列
+            predictions (np.ndarray): 預測值陣列 (shape: [time_steps, n_predictions])
+            
+        Returns:
+            Dict: 包含交易訊號和邊界的字典
+        """
+        signals = []
+        upper_bounds = []
+        lower_bounds = []
+        positions = []  # 1: 持有, 0: 空手
+        current_position = 0
+        
+        for t in range(len(actual_prices)):
+            # 計算這個時間點的上下界
+            lower_bound, upper_bound = self.calculate_bounds(predictions[t])
+            lower_bounds.append(lower_bound)
+            upper_bounds.append(upper_bound)
+            
+            # 生成交易訊號 (1: 買入, -1: 賣出, 0: 不動作)
+            if actual_prices[t] < lower_bound and current_position == 0:
+                signals.append(1)  # 買入訊號
+                current_position = 1
+            elif actual_prices[t] > upper_bound and current_position == 1:
+                signals.append(-1)  # 賣出訊號
+                current_position = 0
+            else:
+                signals.append(0)  # 不動作
+            
+            positions.append(current_position)
+        
+        self.signals = signals
+        self.positions = positions
+        
+        return {
+            'signals': signals,
+            'positions': positions,
+            'upper_bounds': upper_bounds,
+            'lower_bounds': lower_bounds
+        }
+    
+    def calculate_returns(self, prices: np.ndarray) -> Tuple[float, float, float]:
+        """
+        計算交易績效指標
+        
+        Args:
+            prices (np.ndarray): 價格序列
+            
+        Returns:
+            Tuple[float, float, float]: (總報酬率, 年化報酬率, 夏普率)
+        """
+        # 計算每日報酬率
+        daily_returns = []
+        last_buy_price = None
+        
+        for i in range(len(prices)):
+            if self.signals[i] == 1:  # 買入
+                last_buy_price = prices[i]
+            elif self.signals[i] == -1 and last_buy_price is not None:  # 賣出
+                returns = (prices[i] - last_buy_price) / last_buy_price
+                daily_returns.append(returns)
+                last_buy_price = None
+        
+        self.returns = daily_returns
+        
+        # 如果沒有交易，返回零值
+        if not daily_returns:
+            return 0.0, 0.0, 0.0
+        
+        # 計算總報酬率
+        total_return = (1 + np.array(daily_returns)).prod() - 1
+        
+        # 計算年化報酬率 (假設252個交易日)
+        n_days = len(prices)
+        annual_return = (1 + total_return) ** (252 / n_days) - 1
+        
+        # 計算夏普率
+        returns_std = np.std(daily_returns) * np.sqrt(252)  # 年化標準差
+        if returns_std == 0:
+            sharpe_ratio = 0
+        else:
+            sharpe_ratio = (annual_return - self.risk_free_rate) / returns_std
+        
+        return total_return, annual_return, sharpe_ratio
+    
+    def get_trading_metrics(self) -> Dict:
+        """
+        獲取交易統計指標
+        
+        Returns:
+            Dict: 交易統計指標
+        """
+        if not self.returns:
+            return {
+                'total_trades': 0,
+                'win_rate': 0.0,
+                'avg_return': 0.0,
+                'max_drawdown': 0.0
+            }
+        
+        # 計算勝率
+        winning_trades = sum(1 for r in self.returns if r > 0)
+        total_trades = len(self.returns)
+        win_rate = winning_trades / total_trades if total_trades > 0 else 0
+        
+        # 計算平均報酬
+        avg_return = np.mean(self.returns) if self.returns else 0
+        
+        # 計算最大回撤
+        cumulative_returns = np.cumprod(1 + np.array(self.returns))
+        rolling_max = np.maximum.accumulate(cumulative_returns)
+        drawdowns = (rolling_max - cumulative_returns) / rolling_max
+        max_drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0
+        
+        return {
+            'total_trades': total_trades,
+            'win_rate': win_rate,
+            'avg_return': avg_return,
+            'max_drawdown': max_drawdown
+        }
