@@ -10,6 +10,5 @@
 - `preprocessor.py`: 資料預處理、建立 Datasets
 - `simulated.py`: 用 garch + prophet 建立模擬數據
 - `train.py`: 訓練 WGAN-GP 模型
+- `trial.py`: 執行實驗
 - `utils.py`: 視覺化、工具程式碼
-
-# 指令
