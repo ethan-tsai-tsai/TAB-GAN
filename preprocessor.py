@@ -4,7 +4,7 @@ from torch.utils.data import Dataset
 import pickle
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MaxAbsScaler, MinMaxScaler
 from datetime import datetime
 from utils import *
 from arguments import *
@@ -30,8 +30,7 @@ class DataProcessor:
             self._process_training_data()
             
         print(f'Data processing spent {(datetime.now() - start_time).total_seconds(): 2f} seconds')
-    
-    
+
     def _clear_previous_data(self):
         """清理前一個 trial 的資料和變數"""
         # 清理所有實例變數
@@ -106,16 +105,27 @@ class DataProcessor:
         path = f'./data/{self.args.stock}'
         seq_len = 270//self.args.time_step
         window_size = 5
-        test_idx = (window_size * self.trial) * seq_len # 10
-        if self.trial == 1: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):, :]
-        # [-10, -5]
-        else: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):-(test_idx - seq_len * window_size), :]
-        train_dataframe = self.data.iloc[-(test_idx + seq_len * 365 * 2):-test_idx, :]
-        # val_dataframe = self.data[(self.data.index.month==8) & (self.data.index.year==2024)]
-
+        test_idx = (window_size * self.trial) * seq_len
+        if self.trial == 1: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):, :].copy()
+        else: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):-(test_idx - seq_len * window_size), :].copy()
+        train_dataframe = self.data.iloc[-(test_idx + seq_len * 365 * 2):-test_idx, :].copy()
+        
+        # Standardize
+        col_list = list(self.data.columns.drop('y'))
+        scaler_X = MinMaxScaler(feature_range=(-1, 1))
+        scaler_y = MinMaxScaler(feature_range=(-1, 1))
+        train_dataframe[col_list] = scaler_X.fit_transform(train_dataframe[col_list].values)
+        train_dataframe['y'] = scaler_y.fit_transform(train_dataframe[['y']].values)
+        test_dataframe[col_list] = scaler_X.fit_transform(test_dataframe[col_list].values)
+        test_dataframe['y'] = scaler_y.fit_transform(test_dataframe[['y']].values)
+        
+        # save scaler and data
+        with open(f'{path}/scaler_X.pkl', 'wb') as f:
+            pickle.dump(scaler_X, f)
+        with open(f'{path}/scaler_y.pkl', 'wb') as f:
+            pickle.dump(scaler_y, f)
         train_dataframe.to_csv(f'{path}/train.csv')
         test_dataframe.to_csv(f'{path}/test.csv')
-        # val_dataframe.to_csv(f'{path}/val.csv')
  
     def _price_change(self, data):
         changes = [0]
@@ -158,7 +168,7 @@ class StockDataset(Dataset):
         self.seq_len = args.window_size * (270 // args.time_step)
         self.window_size = args.window_size
         self.window_stride = args.window_stride
-
+        
         # read data and set index
         self.data = pd.read_csv(csv_file)
         self.data['ts'] = pd.to_datetime(self.data['ts'])
@@ -167,31 +177,8 @@ class StockDataset(Dataset):
         # get data information
         self.num_features = len(self.data.columns)
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist()
-        
-        self._standardize() 
+
         self._rolling_window()
-    
-    def _standardize(self):
-        col_list = list(self.data.columns.drop('y'))
-        if self._args.mode in ['train', 'optim']:
-            scaler_X = MinMaxScaler(feature_range=(-1, 1))
-            scaler_y = MinMaxScaler(feature_range=(-1, 1))
-            self.data[col_list] = scaler_X.fit_transform(self.data[col_list].values)
-            self.data['y'] = scaler_y.fit_transform(self.data[['y']].values)
-            # save the scaler for testing purposes
-            with open(f'./data/{self._args.stock}/scaler_X.pkl', 'wb') as f:
-                pickle.dump(scaler_X, f)
-            with open(f'./data/{self._args.stock}/scaler_y.pkl', 'wb') as f:
-                pickle.dump(scaler_y, f)
-        else:
-            # load saved scaler
-            with open(f'./data/{self._args.stock}/scaler_X.pkl', 'rb') as f:
-                scaler_X = pickle.load(f)
-            with open(f'./data/{self._args.stock}/scaler_y.pkl', 'rb') as f:
-                scaler_y = pickle.load(f)
-            self.data[col_list] = scaler_X.transform(self.data[col_list].values)
-            if 'y' in self.data.columns:
-                self.data['y'] = scaler_y.transform(self.data[['y']].values)
     
     def _rolling_window(self):
         self.X, self.y = [], []
@@ -211,4 +198,4 @@ class StockDataset(Dataset):
 
 if __name__ == '__main__':
     args = parse_args()
-    data_processor = DataProcessor(args, trial=2)
+    data_processor = DataProcessor(args, trial=1)

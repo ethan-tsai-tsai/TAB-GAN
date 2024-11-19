@@ -1,7 +1,7 @@
 import os
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, Subset, random_split
+from torch.utils.data import DataLoader, random_split
 from datetime import datetime
 # Import file
 from preprocessor import *

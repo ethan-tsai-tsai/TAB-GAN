@@ -172,7 +172,7 @@ class plot_predicions:
         plt.figure(figsize=(10, 5))
         for i, (y, y_hat) in enumerate(zip(y_true, y_pred)):
             # calculate upper and lower bound
-            upper_bound, lower_bound = self._get_bound(y_hat)
+            upper_bound, lower_bound = self.get_bound(y_hat)
             # set values
             y_hat = np.array(y_hat).flatten()
             x_val = np.arange(i, i + self.target_len)
@@ -200,7 +200,7 @@ class plot_predicions:
         file_name = f'fixed_{self.time_interval[0]} - {self.time_interval[-1]}'
         palette = sns.color_palette('pastel', len(arrange_y_pred))
         x_val_true = np.arange(arrange_y_true.shape[0])
-        upper_bound, lower_bound = self._get_bound(arrange_y_pred)
+        upper_bound, lower_bound = self.get_bound(arrange_y_pred)
         
         # plot
         plt.figure(figsize=(10, 5))
@@ -245,7 +245,7 @@ class plot_predicions:
             # band plot
             sns.lineplot(x=x_val, y=y, color='black', ax=ax1)
             for j in range(self.seq_len):
-                upper_bound, lower_bound = self._get_bound(y_hat[j])
+                upper_bound, lower_bound = self.get_bound(y_hat[j])
                 x_val = np.arange(j, self.seq_len)
                 sns.scatterplot(x=x_val.repeat(self.args.pred_times), y=y_hat[j].flatten(), color=palette[j], ax=ax1, alpha=0.3)
                 ax1.fill_between(x_val, lower_bound, upper_bound, color=palette[j], alpha=0.7)
@@ -298,7 +298,7 @@ class plot_predicions:
                     if idx == 0: y_hat.append(np.array(sublist).flatten())
                     else: y_hat.append(np.array(sublist[:-idx]).flatten())
                 
-                upper_bound, lower_bound = self._get_bound(y_hat)
+                upper_bound, lower_bound = self.get_bound(y_hat)
                 x_val = np.arange(j, self.seq_len)
                 x_scatter = np.repeat(x_val, [i.shape[0] for i in y_hat])
                 y_scatter = np.array([i for sublist in y_hat for i in sublist])
@@ -343,7 +343,7 @@ class plot_predicions:
             current_time += timedelta(minutes=x_ticks_interval)
         return time_array
         
-    def _get_bound(self, y_preds):
+    def get_bound(self, y_preds):
         upper_bound = []
         lower_bound = []
         
@@ -463,84 +463,45 @@ class TechnicalIndicators:
         return data
 
 class TradingStrategy:
-    def __init__(self, confidence_level: float = 90.0, risk_free_rate: float = 0.02):
+    def __init__(self, risk_free_rate: float = 0.02):
         """
         初始化交易策略
         
         Args:
-            confidence_level (float): 信賴區間百分比 (例如90表示90%信賴區間)
             risk_free_rate (float): 無風險利率，用於計算夏普率
         """
-        self.confidence_level = confidence_level
         self.risk_free_rate = risk_free_rate
-        self.signals = []
-        self.positions = []
         self.returns = []
         
-    def calculate_bounds(self, predictions: np.ndarray) -> Tuple[float, float]:
+    def generate_signals(self, actual_prices: np.ndarray, upper_bounds: np.ndarray, 
+                        lower_bounds: np.ndarray) -> np.ndarray:
         """
-        計算預測值的上下界
-        
-        Args:
-            predictions (np.ndarray): 某時間點的多次預測值
-            
-        Returns:
-            Tuple[float, float]: (下界, 上界)
-        """
-        lower_percentile = (100 - self.confidence_level) / 2
-        upper_percentile = 100 - lower_percentile
-        
-        lower_bound = np.percentile(predictions, lower_percentile)
-        upper_bound = np.percentile(predictions, upper_percentile)
-        
-        return lower_bound, upper_bound
-    
-    def generate_signals(self, actual_prices: np.ndarray, predictions: np.ndarray) -> Dict:
-        """
-        根據實際價格和預測生成交易訊號
+        根據實際價格和上下界生成交易訊號
         
         Args:
             actual_prices (np.ndarray): 實際價格序列
-            predictions (np.ndarray): 預測值陣列 (shape: [time_steps, n_predictions])
+            upper_bounds (np.ndarray): 上界序列
+            lower_bounds (np.ndarray): 下界序列
             
         Returns:
-            Dict: 包含交易訊號和邊界的字典
+            np.ndarray: 交易訊號序列 (1: 買入, -1: 賣出, 0: 不動作)
         """
         signals = []
-        upper_bounds = []
-        lower_bounds = []
-        positions = []  # 1: 持有, 0: 空手
         current_position = 0
         
         for t in range(len(actual_prices)):
-            # 計算這個時間點的上下界
-            lower_bound, upper_bound = self.calculate_bounds(predictions[t])
-            lower_bounds.append(lower_bound)
-            upper_bounds.append(upper_bound)
-            
-            # 生成交易訊號 (1: 買入, -1: 賣出, 0: 不動作)
-            if actual_prices[t] < lower_bound and current_position == 0:
+            if actual_prices[t] < lower_bounds[t] and current_position == 0:
                 signals.append(1)  # 買入訊號
                 current_position = 1
-            elif actual_prices[t] > upper_bound and current_position == 1:
+            elif actual_prices[t] > upper_bounds[t] and current_position == 1:
                 signals.append(-1)  # 賣出訊號
                 current_position = 0
             else:
                 signals.append(0)  # 不動作
-            
-            positions.append(current_position)
         
-        self.signals = signals
-        self.positions = positions
-        
-        return {
-            'signals': signals,
-            'positions': positions,
-            'upper_bounds': upper_bounds,
-            'lower_bounds': lower_bounds
-        }
+        return np.array(signals)
     
-    def calculate_returns(self, prices: np.ndarray) -> Tuple[float, float, float]:
+    def calculate_returns(self, prices: np.ndarray, signals: np.ndarray) -> Tuple[float, float, float]:
         """
         計算交易績效指標
         
@@ -550,14 +511,14 @@ class TradingStrategy:
         Returns:
             Tuple[float, float, float]: (總報酬率, 年化報酬率, 夏普率)
         """
-        # 計算每日報酬率
+        # 計算每次交易的報酬率
         daily_returns = []
         last_buy_price = None
         
         for i in range(len(prices)):
-            if self.signals[i] == 1:  # 買入
+            if signals[i] == 1:  # 買入
                 last_buy_price = prices[i]
-            elif self.signals[i] == -1 and last_buy_price is not None:  # 賣出
+            elif signals[i] == -1 and last_buy_price is not None:  # 賣出
                 returns = (prices[i] - last_buy_price) / last_buy_price
                 daily_returns.append(returns)
                 last_buy_price = None
@@ -583,39 +544,3 @@ class TradingStrategy:
             sharpe_ratio = (annual_return - self.risk_free_rate) / returns_std
         
         return total_return, annual_return, sharpe_ratio
-    
-    def get_trading_metrics(self) -> Dict:
-        """
-        獲取交易統計指標
-        
-        Returns:
-            Dict: 交易統計指標
-        """
-        if not self.returns:
-            return {
-                'total_trades': 0,
-                'win_rate': 0.0,
-                'avg_return': 0.0,
-                'max_drawdown': 0.0
-            }
-        
-        # 計算勝率
-        winning_trades = sum(1 for r in self.returns if r > 0)
-        total_trades = len(self.returns)
-        win_rate = winning_trades / total_trades if total_trades > 0 else 0
-        
-        # 計算平均報酬
-        avg_return = np.mean(self.returns) if self.returns else 0
-        
-        # 計算最大回撤
-        cumulative_returns = np.cumprod(1 + np.array(self.returns))
-        rolling_max = np.maximum.accumulate(cumulative_returns)
-        drawdowns = (rolling_max - cumulative_returns) / rolling_max
-        max_drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0
-        
-        return {
-            'total_trades': total_trades,
-            'win_rate': win_rate,
-            'avg_return': avg_return,
-            'max_drawdown': max_drawdown
-        }

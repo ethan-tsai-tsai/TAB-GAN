@@ -1,8 +1,7 @@
 # Import Package
 import os
 import torch
-import argparse
-from torch.utils.data import DataLoader
+
 # Import file
 from preprocessor import *
 from model import *
@@ -17,16 +16,9 @@ if __name__ == '__main__':
     check_point = torch.load(f'./model/{FILE_NAME}/final.pth')
     args.mode = 'test' # switch to test mode
     
-    if os.path.exists(f'./model/{FILE_NAME}_args.pkl'):
-        with open(f'./model/{FILE_NAME}_args.pkl', 'rb') as f:
-            saved_args = pickle.load(f)
-        for key, value in saved_args.items():
-            if hasattr(args, key):
-                setattr(args, key, value)
-    else:
-        for key, value in check_point['args'].items(): 
-            if key not in ['pred_times', 'bound_percent']:
-                setattr(args, key, value)
+    for key, value in check_point['args'].items(): 
+        if key not in ['pred_times', 'bound_percent']:
+            setattr(args, key, value)
     
     # setting parameters
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
