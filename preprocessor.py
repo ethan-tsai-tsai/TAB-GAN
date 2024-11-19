@@ -13,7 +13,8 @@ class DataProcessor:
     def __init__(self, args, trial=1):
         self.args = args
         self.trial = trial
-        print('Processing data ......')
+        if self.args.mode not in ['trial']:
+            print('Processing data ......')
         start_time = datetime.now()
         
         # 創建資料夾
@@ -28,8 +29,9 @@ class DataProcessor:
             self._process_simulation_data()
         else:
             self._process_training_data()
-            
-        print(f'Data processing spent {(datetime.now() - start_time).total_seconds(): 2f} seconds')
+        
+        if self.args.mode not in ['trial']:
+            print(f'Data processing spent {(datetime.now() - start_time).total_seconds(): 2f} seconds')
 
     def _clear_previous_data(self):
         """清理前一個 trial 的資料和變數"""

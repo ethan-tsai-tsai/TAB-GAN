@@ -9,7 +9,6 @@ from arguments import parse_args
 from preprocessor import StockDataset, DataProcessor
 from utils import plot_predicions, TechnicalIndicators, TradingStrategy
 from train import wgan
-from trial import verify_data
 
 class TradingAnalysis:
     def __init__(self, args, trial):
@@ -86,16 +85,20 @@ class TradingAnalysis:
         
         # 交易策略分析
         test_data = pd.read_csv(f'./data/{self.args.stock}/test.csv')
+        with open(f'./data/{self.args.stock}/scaler_y.pkl', 'rb') as f:
+            scaler_y = pickle.load(f)
+        test_data['y'] = scaler_y.inverse_transform(test_data[['y']])
+        
         window_size = 270 // self.args.time_step * self.args.window_size
         
         # 布林通道策略
         upper, lower = TechnicalIndicators.bollinger_band(
-            test_data['Close'], 
+            test_data['y'], 
             window_size
         )
         
         # 準備交易數據
-        trading = test_data.iloc[window_size:, [0, 4]].copy()  # 只選取必要的列
+        trading = test_data.iloc[window_size:, [0, -1]].copy()  # 只選取必要的列
         trading['bolling_upper'] = upper[window_size:]
         trading['bolling_lower'] = lower[window_size:]
         
@@ -106,13 +109,13 @@ class TradingAnalysis:
         
         # 生成訊號
         trading['bolling_signals'] = self.strategy.generate_signals(
-            np.array(trading['Close']), 
+            np.array(trading['y']), 
             np.array(trading['bolling_upper']), 
             np.array(trading['bolling_lower'])
         )
         
         trading['pred_signals'] = self.strategy.generate_signals(
-            np.array(trading['Close']), 
+            np.array(trading['y']), 
             np.array(trading['pred_upper']), 
             np.array(trading['pred_lower'])
         )
@@ -123,12 +126,12 @@ class TradingAnalysis:
         
         # 計算績效
         bolling_metrics = self.strategy.calculate_returns(
-            np.array(trading['Close']), 
+            np.array(trading['y']), 
             np.array(trading['bolling_signals'])
         )
         
         pred_metrics = self.strategy.calculate_returns(
-            np.array(trading['Close']), 
+            np.array(trading['y']), 
             np.array(trading['pred_signals'])
         )
         
@@ -147,13 +150,13 @@ if __name__ == '__main__':
     args.mode = 'trial'
     
     # 執行分析
-    num_trials = 1
+    print(f'Starting trial with stock {args.stock}')
+    num_trials = 36
     trading_data = pd.DataFrame()
     for trial in range(1, num_trials + 1):
+        print(f'Running trial {trial}......')
         analyzer = TradingAnalysis(args, trial)
-        print(analyzer.FILE_NAME)
         _ = DataProcessor(args, trial)
-        verify_data(args, trial)
         trading = analyzer.trading_results()
         if trial == 0:
             trading_data = trading
@@ -168,5 +171,5 @@ if __name__ == '__main__':
     print(results.to_string(index=False))
     
     # 儲存結果
-    results.to_csv(f'trading_results_{args.stock}.csv', index=False)
-    trading_data.to_csv(f'trading_signals_{args.stock}.csv', index=False)
+    results.to_csv(f'./data/trading_results_{args.stock}.csv', index=False)
+    trading_data.to_csv(f'./data/trading_signals_{args.stock}.csv', index=False)
