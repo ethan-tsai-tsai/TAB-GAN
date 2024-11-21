@@ -20,10 +20,14 @@ class DCCGARCHSimulator:
         """初始化模擬器"""
         self.args = args
         self.data = data
-        self.n_series = len(data.columns)
+        self.fit_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        self.n_series = len(self.fit_columns)
         self.epsilon = 1e-8
         self.prophet_models = {}
         self.decomposition = {}
+        
+        # 計算價格偏差統計
+        self._calculate_price_metrics()
         
         # 初始化 R 環境
         pandas2ri.activate()
@@ -36,7 +40,27 @@ class DCCGARCHSimulator:
 
         # transform data
         self.data = self.transform(self.data)
+    
+    def _calculate_price_metrics(self):
+        """計算價格相關的統計指標"""
+        # 計算真實平均成交價格
+        self.data['true_avg_price'] = self.data['Amount'] / self.data['Volume']
         
+        # 計算估計的VWAP
+        self.data['estimated_vwap'] = (self.data['Open'] + self.data['High'] + 
+                                     self.data['Low'] + self.data['Close']) / 4
+        
+        # 計算價格偏差率及其統計特性
+        price_deviation = ((self.data['true_avg_price'] - self.data['estimated_vwap']) / 
+                         self.data['estimated_vwap'])
+        
+        self.price_stats = {
+            'mean_deviation': price_deviation.mean(),
+            'std_deviation': price_deviation.std(),
+            'percentile_5': price_deviation.quantile(0.05),
+            'percentile_95': price_deviation.quantile(0.95)
+        }
+    
     def set_path(self):
         self.img_path = f'./img/simulate/{self.args.stock}'
         self.data_path = f'./data/simulated'
@@ -50,7 +74,7 @@ class DCCGARCHSimulator:
         transformed_data = data.copy()
         self.transform_params = {}
         
-        for col in ['Volume', 'Amount']:
+        for col in ['Volume']:
             
             col_data = data[col].copy()
             self.transform_params[col] = {
@@ -65,7 +89,7 @@ class DCCGARCHSimulator:
             col_data = data[col] - data[col].min() + 1
             
             # 2. 對數轉換
-            transformed_values = np.log(col_data)
+            transformed_values = np.log1p(col_data)
             
             # 3. 保存轉換參數
             self.transform_params[col] = {
@@ -79,13 +103,13 @@ class DCCGARCHSimulator:
     def inverse_transform(self, data):
         inversed_data = data.copy()
         
-        for col in ['Volume', 'Amount']:
+        for col in ['Volume']:
             if col in self.transform_params:
                 # 1. 獲取參數
                 min_value = self.transform_params[col]['min_value']
                 
                 # 2. 反轉對數轉換
-                inversed_values = np.exp(data[col])
+                inversed_values = np.expm1(data[col])
                 
                 # 3. 還原到原始尺度
                 inversed_values = inversed_values + min_value - 1
@@ -99,7 +123,7 @@ class DCCGARCHSimulator:
         
     def decompose_series(self) -> None:
         """使用 Prophet 對每個序列進行趨勢和季節性分解"""
-        for col in self.data.columns:
+        for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
             print(f'Fitting column: {col}')
             # 使用轉換後的數據進行分解
             df = pd.DataFrame({
@@ -131,7 +155,7 @@ class DCCGARCHSimulator:
         # 收集所有序列的殘差
         residuals = pd.DataFrame({
             col: self.decomposition[col]['residuals']
-            for col in self.data.columns
+            for col in self.fit_columns
         })
         
         # 數據預處理
@@ -255,12 +279,12 @@ class DCCGARCHSimulator:
             ro.r('set.seed')(seed)
         
         # 儲存模擬結果
-        simulated_data = pd.DataFrame(index=self.data.index, columns=self.data.columns)
+        simulated_data = pd.DataFrame(index=self.data.index, columns=self.fit_columns)
         df_for_prophet = pd.DataFrame({'ds': self.data.index})
 
         simulated_residuals = self.simulate_dcc_garch(len(self.data.index))
         
-        for i, col in enumerate(self.data.columns):
+        for i, col in enumerate(self.fit_columns):
             # 使用原始數據的日期進行預測
             forecast = self.prophet_models[col].predict(df_for_prophet)
             trend = forecast['trend'].values
@@ -288,12 +312,46 @@ class DCCGARCHSimulator:
         # inverse transform
         simulated_data = self.inverse_transform(simulated_data)
         
+        # 根據 Volume 和價格生成 Amount
+        simulated_data = self._generate_amount(simulated_data)
+        
         return simulated_data
+    
+    def _generate_amount(self, simulated_data: pd.DataFrame) -> pd.DataFrame:
+        """根據成交量和價格生成成交金額"""
+        result = simulated_data.copy()
+        
+        # 1. 計算估計的VWAP
+        estimated_vwap = (result['Open'] + result['High'] + 
+                         result['Low'] + result['Close']) / 4
+        
+        # 2. 生成受限的隨機價格偏差
+        n_samples = len(result)
+        price_deviations = np.random.normal(
+            self.price_stats['mean_deviation'],
+            self.price_stats['std_deviation'],
+            size=n_samples
+        )
+        
+        # 限制在合理範圍內
+        price_deviations = np.clip(
+            price_deviations,
+            self.price_stats['percentile_5'],
+            self.price_stats['percentile_95']
+        )
+        
+        # 3. 計算模擬的平均交易價格
+        simulated_avg_price = estimated_vwap * (1 + price_deviations)
+        
+        # 4. 生成成交金額
+        result['Amount'] = result['Volume'] * simulated_avg_price
+        
+        return result
     
     def validate_correlation(self, simulated_data: pd.DataFrame) -> None:
         """驗證原始數據和模擬數據的相關性結構"""
         
-        original_corr = self.data.corr()
+        original_corr = self.data[['Open', 'High', 'Low', 'Close', 'Volume', 'Amount']].corr()
         simulated_corr = simulated_data.corr()
 
         # 繪製熱圖比較
@@ -308,11 +366,13 @@ class DCCGARCHSimulator:
         plt.colorbar(im2, ax=ax2)
         
         # 設置標籤
+        col_list = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount']
+
         for ax in [ax1, ax2]:
-            ax.set_xticks(range(len(self.data.columns)))
-            ax.set_yticks(range(len(self.data.columns)))
-            ax.set_xticklabels(self.data.columns, rotation=45)
-            ax.set_yticklabels(self.data.columns)
+            ax.set_xticks(range(len(col_list)))
+            ax.set_yticks(range(len(col_list)))
+            ax.set_xticklabels(col_list, rotation=45)
+            ax.set_yticklabels(col_list)
         
         plt.tight_layout()
         plt.savefig(f'./img/simulate/{args.stock}/corr.png')
@@ -357,13 +417,57 @@ class DCCGARCHSimulator:
             plt.savefig(os.path.join(self.img_path, f'distribution_{col}.png'))
             plt.close()
     
+    def validate_volume_amount(self, simulated_data: pd.DataFrame) -> None:
+        """驗證Volume和Amount之間的關係"""
+        # 計算原始數據和模擬數據的平均價格
+        orig_avg_price = self.data['Amount'] / self.data['Volume']
+        sim_avg_price = simulated_data['Amount'] / simulated_data['Volume']
+        
+        print("\nPrice Statistics:")
+        print("Original Data:")
+        print(orig_avg_price.describe())
+        print("\nSimulated Data:")
+        print(sim_avg_price.describe())
+        
+        # 計算相關係數
+        orig_corr = np.corrcoef(self.data['Volume'], self.data['Amount'])[0,1]
+        sim_corr = np.corrcoef(simulated_data['Volume'], simulated_data['Amount'])[0,1]
+        
+        print("\nVolume-Amount Correlation:")
+        print(f"Original: {orig_corr:.4f}")
+        print(f"Simulated: {sim_corr:.4f}")
+        
+        # 繪製散點圖比較
+        plt.figure(figsize=(12, 5))
+        
+        plt.subplot(121)
+        plt.scatter(np.log(self.data['Volume']), np.log(self.data['Amount']), 
+                   alpha=0.5, label='Original')
+        plt.title('Original Data')
+        plt.xlabel('Log(Volume)')
+        plt.ylabel('Log(Amount)')
+        plt.grid(True)
+        
+        plt.subplot(122)
+        plt.scatter(np.log(simulated_data['Volume']), 
+                   np.log(simulated_data['Amount']), 
+                   alpha=0.5, label='Simulated')
+        plt.title('Simulated Data')
+        plt.xlabel('Log(Volume)')
+        plt.ylabel('Log(Amount)')
+        plt.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.img_path, 'volume_amount_relationship.png'))
+        plt.close()
+    
     def clean_outliers(self, simulated_data: pd.DataFrame, window: int = 5) -> pd.DataFrame:
         """
         使用移動中位數平滑異常波動
         """
         cleaned_data = simulated_data.copy()
         
-        for col in ['Volume', 'Amount']:
+        for col in ['Volume']:
             # 計算移動中位數
             rolling_median = cleaned_data[col].rolling(window=window, center=True).median()
             rolling_std = cleaned_data[col].rolling(window=window, center=True).std()
@@ -382,21 +486,15 @@ class DCCGARCHSimulator:
         return cleaned_data
     
     def plot_simulation(self, simulated_data: pd.DataFrame) -> None:
-        """
-        繪製原始數據和模擬數據的比較圖
-        
-        Parameters:
-        -----------
-        simulated_data : pd.DataFrame
-            模擬的數據
-        """
-        n_cols = len(self.data.columns)
+        """繪製原始數據和模擬數據的比較圖"""
+        x_col = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount']
+        n_cols = len(x_col)
         fig, axes = plt.subplots(n_cols, 1, figsize=(12, 4*n_cols))
         
         if n_cols == 1:
             axes = [axes]
             
-        for i, col in enumerate(self.data.columns):
+        for i, col in enumerate(x_col):
             # 繪製原始數據
             axes[i].plot(self.data.index, self.data[col], 
                         label='Historical', color='blue')
@@ -418,7 +516,7 @@ class DCCGARCHSimulator:
         if col is not None:
             columns = [col]
         else:
-            columns = self.data.columns
+            columns = self.fit_columns
             
         for col in columns:
             # 創建包含5個子圖的圖表（添加日內模式）
@@ -467,7 +565,7 @@ class DCCGARCHSimulator:
         if col is not None:
             columns = [col]
         else:
-            columns = self.data.columns
+            columns = ['Open', 'High', 'Low', 'Close', 'Volume']
                 
         for col in columns:
             model = self.prophet_models[col]
@@ -511,9 +609,7 @@ class DCCGARCHSimulator:
             plt.close()
 
     def plot_all_components(self) -> None:
-        """
-        繪製所有變數的分解圖和季節性圖
-        """
+        """繪製所有變數的分解圖和季節性圖"""
         
         # 繪製所有分解圖
         self.plot_decomposition()
@@ -541,5 +637,6 @@ if __name__ == '__main__':
     # 驗證結果
     simulator.validate_correlation(simulated_data)
     simulator.validate_statistics(simulated_data)
+    simulator.validate_volume_amount(simulated_data)
 
     simulator.plot_simulation(simulated_data)

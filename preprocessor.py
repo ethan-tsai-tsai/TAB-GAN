@@ -64,6 +64,7 @@ class DataProcessor:
         # 補全缺失值
         self.time_intervals = self.data.index.strftime('%Y-%m-%d').unique().tolist()
         self._complete_data()
+        self.strategy_data = self.data.copy()
         self.data = self.data.iloc[::self.time_step, :]
 
     def _process_simulation_data(self):
@@ -111,6 +112,10 @@ class DataProcessor:
         if self.trial == 1: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):, :].copy()
         else: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):-(test_idx - seq_len * window_size), :].copy()
         train_dataframe = self.data.iloc[-(test_idx + seq_len * 365 * 2):-test_idx, :].copy()
+        strategy_dataframe = self.strategy_data[
+            np.in1d(self.strategy_data.index.date, test_dataframe.index[
+                seq_len * self.args.window_size:].date)
+            ]
         
         # Standardize
         col_list = list(self.data.columns.drop('y'))
@@ -128,6 +133,7 @@ class DataProcessor:
             pickle.dump(scaler_y, f)
         train_dataframe.to_csv(f'{path}/train.csv')
         test_dataframe.to_csv(f'{path}/test.csv')
+        strategy_dataframe.to_csv(f'{path}/strategy.csv')
  
     def _price_change(self, data):
         changes = [0]
