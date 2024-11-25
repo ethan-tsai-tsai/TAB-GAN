@@ -12,14 +12,9 @@ from train import wgan
 
 class TradingAnalysis:
     def __init__(self, args, trial):
-        """
-        初始化交易分析類
-        
-        Args:
-            args: 參數配置
-        """
         self.args = args
         self.args.name = f'trial_{trial}'
+        self.bound_percent = [50, 70, 90]
         self.strategy = TradingStrategy()
         self.FILE_NAME = f'{self.args.stock}_{self.args.name}'
         self.device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
@@ -27,20 +22,10 @@ class TradingAnalysis:
     def load_model_args(self) -> None:
         """載入模型參數"""
         checkpoint = torch.load(f'./model/{self.FILE_NAME}/final.pth')
-        
-        # 嘗試從參數檔案載入
-        if os.path.exists(f'./model/{self.FILE_NAME}_args.pkl'):
-            with open(f'./model/{self.FILE_NAME}_args.pkl', 'rb') as f:
-                saved_args = pickle.load(f)
-            for key, value in saved_args.items():
-                if hasattr(self.args, key):
-                    setattr(self.args, key, value)
-        else:
-            # 從checkpoint載入
-            for key, value in checkpoint['args'].items(): 
-                if key not in ['pred_times', 'bound_percent']:
-                    setattr(self.args, key, value)
-                    
+        for key, value in checkpoint['args'].items(): 
+            if key not in ['pred_times', 'bound_percent']:
+                setattr(self.args, key, value)
+                
         return checkpoint
         
     def prepare_data(self) -> Tuple[torch.Tensor, np.ndarray, StockDataset]:
@@ -58,9 +43,26 @@ class TradingAnalysis:
         pred_upper, pred_lower = [], []
         for pred in y_preds:
             upper, lower = plot_util.get_bound(pred)
-            pred_upper.append(upper[0])
-            pred_lower.append(lower[0])
+            pred_upper += self.get_values_between(upper[0], upper[1])
+            pred_lower += self.get_values_between(lower[0], lower[1])
+            
         return pred_upper, pred_lower
+    
+    def caculate_bolling_band(self, upper, lower):
+        upper_bound = []
+        lower_bound = []
+        for i in range(len(upper) - 1):
+            upper_bound += self.get_values_between(upper[i], upper[i+1])
+            lower_bound += self.get_values_between(lower[i], lower[i+1])
+
+        return upper_bound, lower_bound
+    
+    def get_values_between(self, start, end):
+        # 計算步長
+        step = (end - start) / (self.args.time_step - 1)
+        values = [start + step * i for i in range(self.args.time_step)]
+        
+        return values
     
     def trading_results(self):
         """分析交易策略"""
@@ -85,6 +87,8 @@ class TradingAnalysis:
         
         # 交易策略分析
         test_data = pd.read_csv(f'./data/{self.args.stock}/test.csv')
+        strategy_data = pd.read_csv(f'./data/{self.args.stock}/strategy.csv')
+        
         with open(f'./data/{self.args.stock}/scaler_y.pkl', 'rb') as f:
             scaler_y = pickle.load(f)
         test_data['y'] = scaler_y.inverse_transform(test_data[['y']])
@@ -93,54 +97,68 @@ class TradingAnalysis:
         
         # 布林通道策略
         upper, lower = TechnicalIndicators.bollinger_band(
-            test_data['y'], 
+            pd.concat([test_data['y'], pd.Series(strategy_data.iloc[-1, 4])]), 
             window_size
         )
+        upper, lower = list(upper[window_size:]), list(lower[window_size:])
+        booling_upper, booling_lower = self.caculate_bolling_band(upper, lower)
         
         # 準備交易數據
-        trading = test_data.iloc[window_size:, [0, -1]].copy()  # 只選取必要的列
-        trading['bolling_upper'] = upper[window_size:]
-        trading['bolling_lower'] = lower[window_size:]
+        trading = strategy_data.iloc[:, [0, 4]].copy()
+        trading['bolling_upper'] = booling_upper
+        trading['bolling_lower'] = booling_lower
         
         # 預測界限策略
-        pred_upper, pred_lower = self.calculate_bounds(y_preds, plot_util)
-        trading['pred_upper'] = pred_upper
-        trading['pred_lower'] = pred_lower
+        for bound_percent in self.bound_percent:
+            plot_util.args.bound_percent = bound_percent
+            pred_upper, pred_lower = self.calculate_bounds(y_preds, plot_util)
+            trading[f'pred_upper_{bound_percent}'] = pred_upper
+            trading[f'pred_lower_{bound_percent}'] = pred_lower
+        
+            trading[f'pred_signals_{bound_percent}'] = self.strategy.generate_signals(
+                np.array(trading['Close']), 
+                np.array(trading[f'pred_upper_{bound_percent}']), 
+                np.array(trading[f'pred_lower_{bound_percent}'])
+            )
         
         # 生成訊號
         trading['bolling_signals'] = self.strategy.generate_signals(
-            np.array(trading['y']), 
+            np.array(trading['Close']), 
             np.array(trading['bolling_upper']), 
             np.array(trading['bolling_lower'])
-        )
-        
-        trading['pred_signals'] = self.strategy.generate_signals(
-            np.array(trading['y']), 
-            np.array(trading['pred_upper']), 
-            np.array(trading['pred_lower'])
         )
         
         return trading
     
     def analyze_trading_strategies(self, trading) -> pd.DataFrame:
+        # 儲存所有策略的績效指標
+        all_metrics = []
+        strategy_names = []
         
-        # 計算績效
+        # 計算布林通道策略的績效
+        
         bolling_metrics = self.strategy.calculate_returns(
-            np.array(trading['y']), 
+            np.array(trading['Close']), 
             np.array(trading['bolling_signals'])
         )
+        all_metrics.append(bolling_metrics)
+        strategy_names.append('Bollinger Bands')
         
-        pred_metrics = self.strategy.calculate_returns(
-            np.array(trading['y']), 
-            np.array(trading['pred_signals'])
-        )
+        # 計算各個 bound_percent 的預測通道績效
+        for bound_percent in self.bound_percent:
+            pred_metrics = self.strategy.calculate_returns(
+                np.array(trading['Close']), 
+                np.array(trading[f'pred_signals_{bound_percent}'])
+            )
+            all_metrics.append(pred_metrics)
+            strategy_names.append(f'Prediction Bands {bound_percent}%')
         
-        # 整理結果
+        # 整理所有結果到 DataFrame
         results = pd.DataFrame({
-            'Strategy': ['Bollinger Bands', 'Prediction Bands'],
-            'Total Return': [bolling_metrics[0], pred_metrics[0]],
-            'Annual Return': [bolling_metrics[1], pred_metrics[1]],
-            'Sharpe Ratio': [bolling_metrics[2], pred_metrics[2]]
+            'Strategy': strategy_names,
+            'Total Return': [metrics[0] for metrics in all_metrics],
+            'Annual Return': [metrics[1] for metrics in all_metrics],
+            'Sharpe Ratio': [metrics[2] for metrics in all_metrics]
         })
         
         return results
@@ -151,7 +169,7 @@ if __name__ == '__main__':
     
     # 執行分析
     print(f'Starting trial with stock {args.stock}')
-    num_trials = 36
+    num_trials = 12
     trading_data = pd.DataFrame()
     for trial in range(1, num_trials + 1):
         print(f'Running trial {trial}......')

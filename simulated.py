@@ -315,7 +315,64 @@ class DCCGARCHSimulator:
         # 根據 Volume 和價格生成 Amount
         simulated_data = self._generate_amount(simulated_data)
         
+        simulated_data = self.format_simulated_data(simulated_data)
         return simulated_data
+    
+    def round_price(self, price):
+        """根據台灣股市規則對股價進行四捨五入"""
+        if price < 50:
+            return round(price, 2)  # 小於50元，最小單位0.01
+        elif price < 100:
+            return round(price * 20) / 20  # 50-100元，最小單位0.05
+        elif price < 500:
+            return round(price, 1)  # 100-500元，最小單位0.1
+        elif price < 1000:
+            return round(price * 2) / 2  # 500-1000元，最小單位0.5
+        else:
+            return round(price)  # 大於1000元，最小單位1
+
+    def format_simulated_data(self, simulated_data: pd.DataFrame) -> pd.DataFrame:
+        """格式化模擬數據以符合真實交易數據格式"""
+        formatted_data = simulated_data.copy()
+        
+        # 處理價格欄位
+        price_columns = ['Open', 'High', 'Low', 'Close']
+        for col in price_columns:
+            formatted_data[col] = formatted_data[col].apply(self.round_price)
+        
+        # 驗證並調整價格關係
+        formatted_data[price_columns] = formatted_data[price_columns].apply(
+            self.validate_price_values, axis=1)
+        
+        # 處理成交量和金額
+        formatted_data['Volume'] = formatted_data['Volume'].round().astype(int)
+        formatted_data['Amount'] = formatted_data['Amount'].round().astype(int)
+        
+        # 確保成交量和金額為正數
+        formatted_data['Volume'] = formatted_data['Volume'].clip(lower=0)
+        formatted_data['Amount'] = formatted_data['Amount'].clip(lower=0)
+        
+        return formatted_data
+    
+    def validate_price_values(self, row):
+        """驗證價格高低關係是否合理"""
+        high = row['High']
+        low = row['Low']
+        open_price = row['Open']
+        close = row['Close']
+        
+        # 調整不合理的價格關係
+        if high < max(open_price, close):
+            high = max(open_price, close)
+        if low > min(open_price, close):
+            low = min(open_price, close)
+        
+        return pd.Series({
+            'High': high,
+            'Low': low,
+            'Open': open_price,
+            'Close': close
+        })
     
     def _generate_amount(self, simulated_data: pd.DataFrame) -> pd.DataFrame:
         """根據成交量和價格生成成交金額"""
