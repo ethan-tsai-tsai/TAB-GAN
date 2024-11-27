@@ -111,7 +111,7 @@ class DataProcessor:
         test_idx = (window_size * self.trial) * seq_len
         if self.trial == 1: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):, :].copy()
         else: test_dataframe = self.data.iloc[-(test_idx + seq_len * self.args.window_size):-(test_idx - seq_len * window_size), :].copy()
-        train_dataframe = self.data.iloc[-(test_idx + seq_len * 365 * 2):-test_idx, :].copy()
+        train_dataframe = self.data.iloc[-(test_idx + seq_len * 365 * 1):-test_idx, :].copy()
         strategy_dataframe = self.strategy_data[
             np.in1d(self.strategy_data.index.date, test_dataframe.index[
                 seq_len * self.args.window_size:].date)
