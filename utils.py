@@ -3,8 +3,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import pandas as pd
 import numpy as np
-from typing import Tuple, List, Dict
+from typing import Tuple
 from datetime import datetime, timedelta
 from scipy.linalg import sqrtm
 from scipy.special import rel_entr
@@ -88,7 +89,140 @@ def save_loss_curve(results, args):
     plt.ylabel('Loss')
     plt.legend()
     plt.savefig(f'./logs/{args.stock}_{args.name}/loss.png')
+
+def visualize_band(args):
+    if not os.path.exists('./img/trading_signals'): os.makedirs('./img/trading_signals')
+    file_path = f'./data/trading_signals_{args.stock}.csv'
+    output_path = f'./img/trading_signals/{args.stock}.png'
+    # Read data
+    df = pd.read_csv(file_path, parse_dates=['ts'])
     
+    # Define color scheme for different bands
+    color_scheme = {
+        'bollinger': {
+            'color': '#2C3E50',
+            'alpha': 0.3,
+            'signal_color': '#34495E',
+            'title': 'Bollinger Bands'
+        },
+        '50': {
+            'color': '#E74C3C',
+            'alpha': 0.3,
+            'signal_color': '#C0392B',
+            'title': '50% Prediction Band'
+        },
+        '70': {
+            'color': '#2ECC71',
+            'alpha': 0.3,
+            'signal_color': '#27AE60',
+            'title': '70% Prediction Band'
+        },
+        '90': {
+            'color': '#9B59B6',
+            'alpha': 0.3,
+            'signal_color': '#8E44AD',
+            'title': '90% Prediction Band'
+        }
+    }
+    
+    # Create figure and subplots with adjusted height ratios and spacing
+    fig = plt.figure(figsize=(15, 25))
+    gs = fig.add_gridspec(5, 1, height_ratios=[0.2, 1, 1, 1, 1], hspace=0.3)
+    
+    # Create title subplot and trading subplots
+    title_ax = fig.add_subplot(gs[0])
+    title_ax.axis('off')
+    title_ax.text(0.5, 0.5, 'Trading Strategies Comparison', 
+                 ha='center', va='center', fontsize=14, fontweight='bold')
+    
+    # Create trading subplots
+    axes = [fig.add_subplot(gs[i]) for i in range(1, 5)]
+    
+    sns.set_style("whitegrid")
+    
+    # Configure each subplot
+    band_configs = [
+        {
+            'type': 'bollinger',
+            'upper': 'bolling_upper',
+            'lower': 'bolling_lower',
+            'signals': 'bolling_signals'
+        },
+        {
+            'type': '50',
+            'upper': 'pred_upper_50',
+            'lower': 'pred_lower_50',
+            'signals': 'pred_signals_50'
+        },
+        {
+            'type': '70',
+            'upper': 'pred_upper_70',
+            'lower': 'pred_lower_70',
+            'signals': 'pred_signals_70'
+        },
+        {
+            'type': '90',
+            'upper': 'pred_upper_90',
+            'lower': 'pred_lower_90',
+            'signals': 'pred_signals_90'
+        }
+    ]
+    
+    for ax, config in zip(axes, band_configs):
+        band_type = config['type']
+        colors = color_scheme[band_type]
+        
+        # Plot price line
+        ax.plot(df['ts'], df['Close'], color='black', linewidth=1.5, 
+                label='Close Price', zorder=5)
+        
+        # Plot band
+        ax.fill_between(df['ts'], 
+                       df[config['upper']], 
+                       df[config['lower']],
+                       alpha=colors['alpha'],
+                       color=colors['color'],
+                       label=colors['title'])
+        
+        # Plot buy signals
+        buy_signals = df[df[config['signals']] == 1]
+        if not buy_signals.empty:
+            ax.scatter(buy_signals['ts'], 
+                      buy_signals['Close'] * 0.99,
+                      marker='^', 
+                      s=100,
+                      color=colors['signal_color'],
+                      label='Buy Signal',
+                      zorder=6)
+        
+        # Plot sell signals
+        sell_signals = df[df[config['signals']] == -1]
+        if not sell_signals.empty:
+            ax.scatter(sell_signals['ts'], 
+                      sell_signals['Close'] * 1.01,
+                      marker='v', 
+                      s=100,
+                      color=colors['signal_color'],
+                      label='Sell Signal',
+                      zorder=6)
+        
+        # Customize subplot
+        ax.set_title(colors['title'], fontsize=12, pad=10)
+        ax.grid(True, alpha=0.3)
+        ax.set_xlabel('Time' if ax == axes[-1] else '')
+        ax.set_ylabel('Price')
+        
+        # Format x-axis
+        ax.tick_params(axis='x', rotation=0)
+        ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+        
+        # Add legend inside the plot
+        ax.legend(loc='lower right', framealpha=0.9)
+    
+    # Save plot
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+ 
 def save_model(model_d, model_g, args, file_name):
     # filtering args
     filter_val = ['noise_dim', 
@@ -129,8 +263,9 @@ class plot_predicions:
         self.time_array = self._get_time_interval()
         self.time_interval = time_interval
         # check folder exists
-        if not os.path.exists(self.path): os.makedirs(path)
-        else: clear_folder(self.path)
+        if self.args.mode != 'trial':
+            if not os.path.exists(self.path): os.makedirs(path)
+            else: clear_folder(self.path)
     
     def dist_plot(self, y_true, y_pred):
         # process array
@@ -490,6 +625,7 @@ class TradingStrategy:
         current_position = 0
         
         for t in range(len(actual_prices)):
+            print(current_position)
             if actual_prices[t] < lower_bounds[t] and current_position == 0:
                 signals.append(1)  # 買入訊號
                 current_position = 1
@@ -544,3 +680,8 @@ class TradingStrategy:
             sharpe_ratio = (annual_return - self.risk_free_rate) / returns_std
         
         return total_return, annual_return, sharpe_ratio
+    
+# if __name__ == '__main__':
+#     from arguments import parse_args
+#     args = parse_args()
+#     visualize_band(args)
