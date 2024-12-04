@@ -7,7 +7,7 @@ from typing import Tuple
 
 from arguments import parse_args
 from preprocessor import StockDataset, DataProcessor
-from utils import plot_predicions, TechnicalIndicators, TradingStrategy
+from utils import plot_predicions, TechnicalIndicators, TradingStrategy, visualize_band
 from train import wgan
 
 class TradingAnalysis:
@@ -64,7 +64,7 @@ class TradingAnalysis:
         
         return values
     
-    def trading_results(self):
+    def bound_results(self):
         """分析交易策略"""
         # 載入模型和參數
         checkpoint = self.load_model_args()
@@ -115,22 +115,21 @@ class TradingAnalysis:
             trading[f'pred_upper_{bound_percent}'] = pred_upper
             trading[f'pred_lower_{bound_percent}'] = pred_lower
         
+        return trading
+    
+    def analyze_trading_strategies(self, trading) -> pd.DataFrame:
+        # 生成訊號
+        for bound_percent in self.bound_percent:
             trading[f'pred_signals_{bound_percent}'] = self.strategy.generate_signals(
                 np.array(trading['Close']), 
                 np.array(trading[f'pred_upper_{bound_percent}']), 
                 np.array(trading[f'pred_lower_{bound_percent}'])
             )
-        
-        # 生成訊號
         trading['bolling_signals'] = self.strategy.generate_signals(
             np.array(trading['Close']), 
             np.array(trading['bolling_upper']), 
             np.array(trading['bolling_lower'])
         )
-        
-        return trading
-    
-    def analyze_trading_strategies(self, trading) -> pd.DataFrame:
         # 儲存所有策略的績效指標
         all_metrics = []
         strategy_names = []
@@ -175,7 +174,7 @@ if __name__ == '__main__':
         print(f'Running trial {trial}......')
         analyzer = TradingAnalysis(args, trial)
         _ = DataProcessor(args, trial)
-        trading = analyzer.trading_results()
+        trading = analyzer.bound_results()
         if trial == 0:
             trading_data = trading
         else:
@@ -191,3 +190,5 @@ if __name__ == '__main__':
     # 儲存結果
     results.to_csv(f'./data/trading_results_{args.stock}.csv', index=False)
     trading_data.to_csv(f'./data/trading_signals_{args.stock}.csv', index=False)
+    
+    visualize_band(args)

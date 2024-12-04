@@ -318,6 +318,50 @@ class DCCGARCHSimulator:
         simulated_data = self.format_simulated_data(simulated_data)
         return simulated_data
     
+    def simulate_close(self, target_date: str, n_simulations: int = 1000) -> pd.DataFrame:
+        """模擬單一時間點的收盤價"""
+        # 生成時間點列表
+        time_points = [
+            pd.Timestamp(f"{target_date} 09:01:00"),
+            pd.Timestamp(f"{target_date} 09:31:00"),
+            pd.Timestamp(f"{target_date} 10:01:00"),
+            pd.Timestamp(f"{target_date} 10:31:00"),
+            pd.Timestamp(f"{target_date} 11:01:00"),
+            pd.Timestamp(f"{target_date} 11:31:00"),
+            pd.Timestamp(f"{target_date} 12:01:00"),
+            pd.Timestamp(f"{target_date} 12:31:00"),
+            pd.Timestamp(f"{target_date} 13:01:00"),
+        ]
+        
+        simulated_closes = []
+        dates = []
+        
+        self.decompose_series()
+        self.fit_dcc_garch()
+        
+        # 預測每個時間點
+        for time_point in time_points:
+            df_for_prophet = pd.DataFrame({'ds': [time_point]})
+            forecast = self.prophet_models['Close'].predict(df_for_prophet)
+            trend = forecast['trend'].values[0]
+            seasonal = (forecast['yearly'] + forecast['weekly'] + forecast['daily']).values[0]
+            
+            # 對每個時間點進行n_simulations次模擬
+            for _ in range(n_simulations):
+                residuals = self.simulate_dcc_garch(1)[0]
+                close_price = trend + seasonal + residuals[3]
+                simulated_closes.append(close_price)
+                dates.append(time_point)
+        
+        # 轉換為DataFrame並處理格式
+        results = pd.DataFrame({
+            'date': dates,
+            'Close': simulated_closes
+        })
+        results['Close'] = results['Close'].apply(self.round_price)
+        
+        return results
+    
     def round_price(self, price):
         """根據台灣股市規則對股價進行四捨五入"""
         if price < 50:

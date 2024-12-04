@@ -284,6 +284,16 @@ class plot_predicions:
         plt.savefig(f'{self.path}/dist.png')
         plt.close()
     
+    def dist_simulate_plot(self, y_simulated, y_pred, file_name):
+        _, axes = plt.subplots(3, 3, figsize=(12, 12))
+        for i, ax in enumerate(axes.flat):
+            sns.histplot(y_pred[i], ax=ax, stat='density', color='green', alpha=0.3, legend=False)
+            sns.histplot(y_simulated[i], ax=ax, stat='density', color='red', alpha=0.3, legend=False)
+            ax.set_title(f'{self.time_array[i]}')
+        plt.tight_layout()
+        plt.savefig(f'{self.path}/{file_name}.png')
+        plt.close()
+    
     def fixed_dist_plot(self, y_true, y_pred):
         # process array
         arrange_y_pred = self._arrange_list_dist_fixed(y_pred).transpose(1, 0, 2).reshape(y_pred.shape[1], y_pred.shape[0] * y_pred.shape[2])
@@ -625,7 +635,6 @@ class TradingStrategy:
         current_position = 0
         
         for t in range(len(actual_prices)):
-            print(current_position)
             if actual_prices[t] < lower_bounds[t] and current_position == 0:
                 signals.append(1)  # 買入訊號
                 current_position = 1
