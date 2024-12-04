@@ -42,28 +42,28 @@ def fid_score(generated_data, real_data):
     return fid_value
 
 def calc_kld(generated_data, ground_truth, bins=50, epsilon=1e-10):
-    # Find the range that covers both datasets
-    min_val = min(np.min(generated_data), np.min(ground_truth))
-    max_val = max(np.max(generated_data), np.max(ground_truth))
+    # 確保數據是numpy數組
+    y_true = np.array(generated_data)
+    y_pred = np.array(ground_truth)
     
-    # Create consistent bins for both histograms
-    bins = np.linspace(min_val, max_val, bins+1)
+    # 找到數據的範圍
+    min_val = min(y_true.min(), y_pred.min())
+    max_val = max(y_true.max(), y_pred.max())
     
-    # Calculate histograms with the same bins
-    pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True)
-    pd_gen, _ = np.histogram(generated_data, bins=bins, density=True)
+    # 計算直方圖
+    hist_true, _ = np.histogram(y_true, bins=bins, range=(min_val, max_val), density=True)
+    hist_pred, _ = np.histogram(y_pred, bins=bins, range=(min_val, max_val), density=True)
     
-    # Add small constant to avoid division by zero
-    pd_gt = pd_gt + epsilon
-    pd_gen = pd_gen + epsilon
+    # 添加平滑處理，避免零概率
+    hist_true = hist_true + epsilon
+    hist_pred = hist_pred + epsilon
     
-    # Normalize to ensure proper probability distributions
-    pd_gt = pd_gt / np.sum(pd_gt)
-    pd_gen = pd_gen / np.sum(pd_gen)
+    # 正規化
+    hist_true = hist_true / hist_true.sum()
+    hist_pred = hist_pred / hist_pred.sum()
     
-    # Calculate KL divergence using scipy's rel_entr
-    # rel_entr computes x * log(x/y) element-wise
-    kld = np.sum(rel_entr(pd_gt, pd_gen))
+    # 計算KL散度
+    kld = np.sum(hist_true * np.log(hist_true / hist_pred))
     
     return kld
 
