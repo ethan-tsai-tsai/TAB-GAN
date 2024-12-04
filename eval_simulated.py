@@ -63,14 +63,14 @@ if __name__ == '__main__':
     plot_util = plot_predicions(path=f'./img/simulated_dist/{FILE_NAME}', args=args, time_interval=time_interval)
     
     # get predictions
-    X = X[-9::]
+    X = X[:9]
     y_preds, _ = wgan_model.predict(X, y)
     # get data
     args.stock = args.stock.replace('_simulated', '')
     data = processor.get_data()
     # get simulations
     simulator = DCCGARCHSimulator(args, data)
-    y_trues = simulator.simulate_close(time_interval[-1], 100)
+    y_trues = simulator.simulate_close(time_interval[0], 100)
     y_trues = y_trues.groupby('date')['Close'].apply(lambda x: x.values).values
     
     all_metrics = []
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         print(f'Step: {step + 1}....')
         y_pred = y_preds[:, step, :]
         # plot predictions
-        plot_util.dist_simulate_plot(y_trues, y_pred, f'step_{step}')
+        plot_util.dist_simulate_plot(y_trues, y_pred, f'{time_interval[0]}_step_{step}')
         # calculate statistics
         metrics_df = calculate_metrics(y_trues, y_pred)
         metrics_df['prediction_step'] = step
