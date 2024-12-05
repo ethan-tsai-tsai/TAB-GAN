@@ -20,43 +20,8 @@ class wgan:
 
         # initialize folder
         self.FOLDER_NAME = f'{args.stock}_{args.name}'
-        if not os.path.exists(f'model/{self.FOLDER_NAME}'):os.makedirs(f'model/{self.FOLDER_NAME}')
+        if not os.path.exists(f'model_saved/{self.FOLDER_NAME}'):os.makedirs(f'model_saved/{self.FOLDER_NAME}')
         
-        if self.args.mode=='train':
-            if not os.path.exists(f'logs/{self.FOLDER_NAME}'):os.makedirs(f'logs/{self.FOLDER_NAME}')
-        
-    def _generator_loss(self, cond, fake_data):
-        return -torch.mean(self.model_d(cond, fake_data))
-    
-    def _discriminator_loss(self, cond, real_data, fake_data, gradient_penalty=0):
-        return -torch.mean(self.model_d(cond, real_data)) + torch.mean(self.model_d(cond, fake_data)) + self.args.gp_lambda * gradient_penalty
-    
-    def _compute_gradient_penalty(self, cond, real_data, fake_data):
-        batch_size = real_data.size()[0]
-
-        # Calculate interpolation
-        alpha = torch.rand(batch_size, 1)
-        alpha = alpha.expand_as(real_data).to(self.device)
-        interpolated = alpha * real_data.data + (1 - alpha) * fake_data.data
-        interpolated = torch.autograd.Variable(interpolated, requires_grad=True).to(self.device)
-
-        # Calculate probability of interpolated examples
-        prob_interpolated = self.model_d(cond, interpolated)
-
-        # Calculate gradients of probabilities with respect to examples
-        gradients = torch.autograd.grad(
-            outputs=prob_interpolated,
-            inputs=interpolated,
-            grad_outputs=torch.ones(prob_interpolated.size(), device=self.device),
-            create_graph=True,
-            retain_graph=True,
-            only_inputs=True
-        )[0]
-
-        gradients = gradients.view(batch_size, -1)
-        gradients_norm = torch.sqrt(torch.sum(gradients ** 2, dim=1) + 1e-12)
-        return ((gradients_norm - 1) ** 2).mean()
-    
     def train(self, train_loader, val_loader):
         # training set
         optimizer_d = torch.optim.AdamW(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
@@ -98,7 +63,7 @@ class wgan:
                 optimizer_g.step()
             total_loss_d += loss_d.cpu().detach().numpy()
             total_loss_g += loss_g.cpu().detach().numpy()
-            test_loss_d, test_loss_g, kld, fid = self.validation(val_loader)
+            test_loss_d, test_loss_g, kld = self.validation(val_loader)
             
             results['loss_d'].append(total_loss_d)
             results['loss_g'].append(total_loss_g)
@@ -138,16 +103,18 @@ class wgan:
                 if kld < self.BEST_KLD and kld != np.inf:
                     self.BEST_KLD = kld
                     if self.args.mode=='train': 
-                        file_name = f'./model/{self.args.stock}_{self.args.name}/best.pth'
+                        file_name = f'./model_saved/{self.args.stock}_{self.args.name}/best.pth'
                         save_model(self.model_d, self.model_g, self.args, file_name)
                         print(f'update best model with kld = {kld}')
         return total_loss_d, total_loss_g, kld
         
     def predict(self, X, y=None):
-        # load scaler
+        # load parameters
         with open(f'./data/{self.args.stock}/scaler_y.pkl', 'rb') as f:
             scaler_y = pickle.load(f)
-
+        check_point = torch.load(f'./model_saved/{self.FOLDER_NAME}/final.pth')
+        self.model_g.load_state_dict(check_point['model_g'])
+        
         # prediction
         y_preds = np.array([])
         self.model_g.eval()
@@ -162,3 +129,36 @@ class wgan:
                 
             y_trues = scaler_y.inverse_transform(y)
         return y_preds, y_trues
+
+    def _generator_loss(self, cond, fake_data):
+        return -torch.mean(self.model_d(cond, fake_data))
+    
+    def _discriminator_loss(self, cond, real_data, fake_data, gradient_penalty=0):
+        return -torch.mean(self.model_d(cond, real_data)) + torch.mean(self.model_d(cond, fake_data)) + self.args.gp_lambda * gradient_penalty
+    
+    def _compute_gradient_penalty(self, cond, real_data, fake_data):
+        batch_size = real_data.size()[0]
+
+        # Calculate interpolation
+        alpha = torch.rand(batch_size, 1)
+        alpha = alpha.expand_as(real_data).to(self.device)
+        interpolated = alpha * real_data.data + (1 - alpha) * fake_data.data
+        interpolated = torch.autograd.Variable(interpolated, requires_grad=True).to(self.device)
+
+        # Calculate probability of interpolated examples
+        prob_interpolated = self.model_d(cond, interpolated)
+
+        # Calculate gradients of probabilities with respect to examples
+        gradients = torch.autograd.grad(
+            outputs=prob_interpolated,
+            inputs=interpolated,
+            grad_outputs=torch.ones(prob_interpolated.size(), device=self.device),
+            create_graph=True,
+            retain_graph=True,
+            only_inputs=True
+        )[0]
+
+        gradients = gradients.view(batch_size, -1)
+        gradients_norm = torch.sqrt(torch.sum(gradients ** 2, dim=1) + 1e-12)
+        return ((gradients_norm - 1) ** 2).mean()
+    

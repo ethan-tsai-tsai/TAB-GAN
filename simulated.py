@@ -1,20 +1,22 @@
+# import packages
 import os
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import rpy2.robjects as ro
+from typing import Optional
 from prophet import Prophet
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict, Optional
-import rpy2.robjects as ro
-from scipy import stats
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
-import warnings
-warnings.filterwarnings('ignore')
 
+# import files
 from arguments import parse_args
 from preprocessor import DataProcessor
-from stock_GAN.lib.utils import *
+from lib.utils import clear_folder
+
+warnings.filterwarnings('ignore')
 
 class DCCGARCHSimulator:
     def __init__(self, args, data: pd.DataFrame):

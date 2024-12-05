@@ -12,7 +12,7 @@ if __name__ == '__main__':
     # set arguments
     args = parse_args()
     FILE_NAME = f'{args.stock}_{args.name}'
-    check_point = torch.load(f'./model/_saved{FILE_NAME}/final.pth')
+    check_point = torch.load(f'./model_saved/{FILE_NAME}/final.pth')
     args.mode = 'test' # switch to test mode
     
     for key, value in check_point['args'].items(): 
@@ -21,7 +21,6 @@ if __name__ == '__main__':
     
     # setting parameters
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
-    target_length = args.target_length // args.time_step
     
     test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     time_interval = test_datasets.time_intervals[args.window_size:]

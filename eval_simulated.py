@@ -5,11 +5,12 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 # import file
-from train import wgan
+from model.mygan import wgan
+from lib.calc import calc_kld
+from arguments import parse_args
 from simulated import DCCGARCHSimulator
 from preprocessor import DataProcessor, StockDataset
-from arguments import parse_args
-from stock_GAN.lib.utils import plot_predicions, calc_kld
+from lib.visulization import plot_predicions, calc_kld
 
 def calculate_metrics(y_true, y_pred):
     """Calculate RMSE, MAE, and KLD for each time step"""
