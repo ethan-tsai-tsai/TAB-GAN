@@ -7,7 +7,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 # import file
-from utils import clear_folder
+from lib.utils import clear_folder
 
 def visualize_band(args):
     if not os.path.exists('./img/trading_signals'): os.makedirs('./img/trading_signals')

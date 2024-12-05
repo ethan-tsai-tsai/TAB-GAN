@@ -1,7 +1,7 @@
 __pycache__/
 data/*
 img/*
-model/*
+model_saved/*
 out/*
 logs/*
 res/*
