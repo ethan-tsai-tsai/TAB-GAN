@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from prophet import Prophet
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict, Optional
@@ -13,7 +14,7 @@ warnings.filterwarnings('ignore')
 
 from arguments import parse_args
 from preprocessor import DataProcessor
-from utils import *
+from stock_GAN.lib.utils import *
 
 class DCCGARCHSimulator:
     def __init__(self, args, data: pd.DataFrame):

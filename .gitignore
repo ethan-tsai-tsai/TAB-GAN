@@ -4,5 +4,6 @@ img/*
 model/*
 out/*
 logs/*
+res/*
 .command.sh
 .Rhistory

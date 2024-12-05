@@ -5,10 +5,12 @@ import numpy as np
 import pandas as pd
 from typing import Tuple
 
-from arguments import parse_args
-from preprocessor import StockDataset, DataProcessor
-from utils import plot_predicions, TechnicalIndicators, TradingStrategy, visualize_band
 from train import wgan
+from arguments import parse_args
+from lib.strategy import TradingStrategy
+from lib.calc import TechnicalIndicators
+from preprocessor import StockDataset, DataProcessor
+from lib.visulization import plot_predicions, visualize_band
 
 class TradingAnalysis:
     def __init__(self, args, trial):

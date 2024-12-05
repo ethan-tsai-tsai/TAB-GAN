@@ -1,4 +1,5 @@
 # import packages
+import os
 import torch
 import numpy as np
 import pandas as pd
@@ -8,12 +9,10 @@ from train import wgan
 from simulated import DCCGARCHSimulator
 from preprocessor import DataProcessor, StockDataset
 from arguments import parse_args
-from utils import plot_predicions, calc_kld
+from stock_GAN.lib.utils import plot_predicions, calc_kld
 
 def calculate_metrics(y_true, y_pred):
-    """
-    Calculate RMSE, MAE, and KLD for each time step
-    """
+    """Calculate RMSE, MAE, and KLD for each time step"""
     metrics = []
     
     for i in range(len(y_true)):
@@ -67,14 +66,15 @@ if __name__ == '__main__':
     y_preds, _ = wgan_model.predict(X, y)
     # get data
     args.stock = args.stock.replace('_simulated', '')
-    data = processor.get_data()
+    preprocessor = DataProcessor(args)
+    data = preprocessor.get_data()
     # get simulations
     simulator = DCCGARCHSimulator(args, data)
-    y_trues = simulator.simulate_close(time_interval[0], 100)
+    y_trues = simulator.simulate_close(time_interval[0], 1000)
     y_trues = y_trues.groupby('date')['Close'].apply(lambda x: x.values).values
     
     all_metrics = []
-    for step in range(0, 9):
+    for step in range(0, 1):
         print(f'Step: {step + 1}....')
         y_pred = y_preds[:, step, :]
         # plot predictions
@@ -85,4 +85,7 @@ if __name__ == '__main__':
         all_metrics.append(metrics_df)
     
     final_metrics = pd.concat(all_metrics, ignore_index=True)
-    final_metrics.to_csv(f'./data/{FILE_NAME}_metrics.csv', index=False)
+    
+    res_path = f'./res/{args.stock}_simulated'
+    if not os.path.exists(res_path): os.makedirs(res_path)
+    final_metrics.to_csv(f'{res_path}/{time_interval[0]}_metrics.csv', index=False)

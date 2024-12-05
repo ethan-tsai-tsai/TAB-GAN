@@ -1,94 +1,13 @@
-import torch
+# import packages
+import os
+import numpy as np
+import pandas as pd
+import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn as sns
-import os
-import pandas as pd
-import numpy as np
-from typing import Tuple
 from datetime import datetime, timedelta
-from scipy.linalg import sqrtm
-from scipy.special import rel_entr
-
-def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
-    # 計算均值差的平方
-    diff = mu1 - mu2
-    diff_squared = np.sum(diff ** 2)
-
-    # 計算協方差矩陣的乘積的平方根
-    covmean, _ = sqrtm(sigma1.dot(sigma2), disp=False)
-
-    # 確保協方差矩陣的數值穩定性
-    if np.iscomplexobj(covmean):
-        covmean = covmean.real
-
-    # 計算 FID
-    fid_value = diff_squared + np.trace(sigma1 + sigma2 - 2 * covmean)
-
-    return fid_value
-
-def calculate_statistics(data):
-    mu = np.mean(data, axis=0)
-    sigma = np.cov(data, rowvar=False)
-    return mu, sigma
-
-def fid_score(generated_data, real_data):
-    # 計算真實數據和生成數據的均值和協方差
-    mu1, sigma1 = calculate_statistics(real_data)
-    mu2, sigma2 = calculate_statistics(generated_data)
-
-    # 計算 FID
-    fid_value = calculate_frechet_distance(mu1, sigma1, mu2, sigma2)
-    return fid_value
-
-def calc_kld(generated_data, ground_truth, bins=50, epsilon=1e-10):
-    # 確保數據是numpy數組
-    y_true = np.array(generated_data)
-    y_pred = np.array(ground_truth)
-    
-    # 找到數據的範圍
-    min_val = min(y_true.min(), y_pred.min())
-    max_val = max(y_true.max(), y_pred.max())
-    
-    # 計算直方圖
-    hist_true, _ = np.histogram(y_true, bins=bins, range=(min_val, max_val), density=True)
-    hist_pred, _ = np.histogram(y_pred, bins=bins, range=(min_val, max_val), density=True)
-    
-    # 添加平滑處理，避免零概率
-    hist_true = hist_true + epsilon
-    hist_pred = hist_pred + epsilon
-    
-    # 正規化
-    hist_true = hist_true / hist_true.sum()
-    hist_pred = hist_pred / hist_pred.sum()
-    
-    # 計算KL散度
-    kld = np.sum(hist_true * np.log(hist_true / hist_pred))
-    
-    return kld
-
-def save_loss_curve(results, args):
-    print('Saving loss curve')
-    plt.figure(figsize=(20, 10))
-    # train loss curve
-    plt.subplot(1, 2, 1)
-    plt.axhline(y=0, color='gray', linestyle='-')
-    plt.plot(range(args.epoch), results['loss_d'], label='Discriminator Loss')
-    plt.plot(range(args.epoch), results['loss_g'], label='Generator Loss')
-    plt.title('Training Loss Curve')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    # test loss curve
-    plt.subplot(1, 2, 2)
-    plt.axhline(y=0, color='gray', linestyle='-')
-    plt.plot(range(args.epoch), results['test_loss_d'], label='Discriminator Loss')
-    plt.plot(range(args.epoch), results['test_loss_g'], label='Generator Loss')
-    plt.title('Testing Loss Curve')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.savefig(f'./logs/{args.stock}_{args.name}/loss.png')
+# import file
+from utils import clear_folder
 
 def visualize_band(args):
     if not os.path.exists('./img/trading_signals'): os.makedirs('./img/trading_signals')
@@ -222,37 +141,29 @@ def visualize_band(args):
     # Save plot
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
- 
-def save_model(model_d, model_g, args, file_name):
-    # filtering args
-    filter_val = ['noise_dim', 
-                  'epoch', 'batch_size', 
-                  'hidden_dim_g', 'num_layers_g', 'lr_g',
-                  'hidden_dim_d', 'num_layers_d', 'lr_d',
-                  'd_iter', 'gp_lambda']
-    args = {key:value for key, value in vars(args).items() if key in filter_val}
-    torch.save({
-        'args': args,
-        'model_d': model_d.state_dict(),
-        'model_g': model_g.state_dict()
-    }, file_name)
-
-def clear_folder(folder_path):
-    # Make sure the folder exists
-    if not os.path.exists(folder_path):
-        print(f"資料夾 {folder_path} 不存在。")
-        return
-
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        try:
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-            elif os.path.isdir(file_path):
-                clear_folder(file_path)
-                os.rmdir(file_path)
-        except Exception as e:
-            print(f"when delete {file_path} has error: {e}")
+    
+def save_loss_curve(results, args):
+    print('Saving loss curve')
+    plt.figure(figsize=(20, 10))
+    # train loss curve
+    plt.subplot(1, 2, 1)
+    plt.axhline(y=0, color='gray', linestyle='-')
+    plt.plot(range(args.epoch), results['loss_d'], label='Discriminator Loss')
+    plt.plot(range(args.epoch), results['loss_g'], label='Generator Loss')
+    plt.title('Training Loss Curve')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    # test loss curve
+    plt.subplot(1, 2, 2)
+    plt.axhline(y=0, color='gray', linestyle='-')
+    plt.plot(range(args.epoch), results['test_loss_d'], label='Discriminator Loss')
+    plt.plot(range(args.epoch), results['test_loss_g'], label='Generator Loss')
+    plt.title('Testing Loss Curve')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig(f'./logs/{args.stock}_{args.name}/loss.png')
 
 class plot_predicions:
     def __init__(self, path, args, time_interval):
@@ -527,170 +438,3 @@ class plot_predicions:
         # for item in result:
         #     print(np.array(item).shape)
         return result
-
-class TechnicalIndicators:
-    @staticmethod
-    def SMA(data, windows):
-        """Simple Moving Average"""
-        return data.rolling(window=windows).mean()
-
-    @staticmethod
-    def EMA(data, windows):
-        """Exponential Moving Average"""
-        return data.ewm(span=windows).mean()
-
-    @staticmethod
-    def MACD(data, long, short, windows):
-        """Moving Average Convergence Divergence"""
-        short_ = data.ewm(span=short).mean()
-        long_ = data.ewm(span=long).mean()
-        macd_ = short_ - long_
-        return macd_.ewm(span=windows).mean()
-
-    @staticmethod
-    def RSI(data, windows):
-        """Relative Strength Index"""
-        delta = data.diff(1)
-        up = delta.copy()
-        down = delta.copy()
-        up[up < 0] = 0
-        down[down > 0] = 0
-        avg_up = up.rolling(window=windows).mean()
-        avg_down = down.rolling(window=windows).mean()
-        rs = avg_up / avg_down
-        return 100.0 - (100.0 / (1.0 + rs))
-
-    @staticmethod
-    def ATR(high, low, windows):
-        """Average True Range"""
-        range_ = high - low
-        return range_.rolling(window=windows).mean()
-
-    @staticmethod
-    def bollinger_band(data, windows):
-        """Bollinger Bands"""
-        sma = data.rolling(window=windows).mean()
-        std = data.rolling(window=windows).std()
-        upper = sma + 2 * std
-        lower = sma - 2 * std
-        return upper, lower
-
-    @staticmethod
-    def RSV(data, windows):
-        """Raw Stochastic Value"""
-        min_ = data.rolling(window=windows).min()
-        max_ = data.rolling(window=windows).max()
-        return (data - min_) / (max_ - min_) * 100
-
-    @staticmethod
-    def add_all_indicators(df):
-        """Add all technical indicators to the dataframe"""
-        data = df.copy()
-        
-        # Moving Averages
-        for window in [7, 14, 21]:
-            data[f'{window}ma'] = TechnicalIndicators.EMA(data['Close'], window)
-        
-        # MACD
-        data['7macd'] = TechnicalIndicators.MACD(data['Close'], 3, 11, 7)
-        data['14macd'] = TechnicalIndicators.MACD(data['Close'], 7, 21, 14)
-        
-        # ATR
-        for window in [7, 14, 21]:
-            data[f'{window}atr'] = TechnicalIndicators.ATR(data['High'], data['Low'], window)
-        
-        # Bollinger Bands
-        for window in [7, 14, 21]:
-            upper, lower = TechnicalIndicators.bollinger_band(data['Close'], window)
-            data[f'{window}upper'] = upper
-            data[f'{window}lower'] = lower
-        
-        return data
-
-class TradingStrategy:
-    def __init__(self, risk_free_rate: float = 0.02):
-        """
-        初始化交易策略
-        
-        Args:
-            risk_free_rate (float): 無風險利率，用於計算夏普率
-        """
-        self.risk_free_rate = risk_free_rate
-        self.returns = []
-        
-    def generate_signals(self, actual_prices: np.ndarray, upper_bounds: np.ndarray, 
-                        lower_bounds: np.ndarray) -> np.ndarray:
-        """
-        根據實際價格和上下界生成交易訊號
-        
-        Args:
-            actual_prices (np.ndarray): 實際價格序列
-            upper_bounds (np.ndarray): 上界序列
-            lower_bounds (np.ndarray): 下界序列
-            
-        Returns:
-            np.ndarray: 交易訊號序列 (1: 買入, -1: 賣出, 0: 不動作)
-        """
-        signals = []
-        current_position = 0
-        
-        for t in range(len(actual_prices)):
-            if actual_prices[t] < lower_bounds[t] and current_position == 0:
-                signals.append(1)  # 買入訊號
-                current_position = 1
-            elif actual_prices[t] > upper_bounds[t] and current_position == 1:
-                signals.append(-1)  # 賣出訊號
-                current_position = 0
-            else:
-                signals.append(0)  # 不動作
-        
-        return np.array(signals)
-    
-    def calculate_returns(self, prices: np.ndarray, signals: np.ndarray) -> Tuple[float, float, float]:
-        """
-        計算交易績效指標
-        
-        Args:
-            prices (np.ndarray): 價格序列
-            
-        Returns:
-            Tuple[float, float, float]: (總報酬率, 年化報酬率, 夏普率)
-        """
-        # 計算每次交易的報酬率
-        daily_returns = []
-        last_buy_price = None
-        
-        for i in range(len(prices)):
-            if signals[i] == 1:  # 買入
-                last_buy_price = prices[i]
-            elif signals[i] == -1 and last_buy_price is not None:  # 賣出
-                returns = (prices[i] - last_buy_price) / last_buy_price
-                daily_returns.append(returns)
-                last_buy_price = None
-        
-        self.returns = daily_returns
-        
-        # 如果沒有交易，返回零值
-        if not daily_returns:
-            return 0.0, 0.0, 0.0
-        
-        # 計算總報酬率
-        total_return = (1 + np.array(daily_returns)).prod() - 1
-        
-        # 計算年化報酬率 (假設252個交易日)
-        n_days = len(prices)
-        annual_return = (1 + total_return) ** (252 / n_days) - 1
-        
-        # 計算夏普率
-        returns_std = np.std(daily_returns) * np.sqrt(252)  # 年化標準差
-        if returns_std == 0:
-            sharpe_ratio = 0
-        else:
-            sharpe_ratio = (annual_return - self.risk_free_rate) / returns_std
-        
-        return total_return, annual_return, sharpe_ratio
-    
-# if __name__ == '__main__':
-#     from arguments import parse_args
-#     args = parse_args()
-#     visualize_band(args)

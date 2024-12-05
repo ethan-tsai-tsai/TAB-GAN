@@ -2,8 +2,8 @@ from torch.utils.data import DataLoader
 import optuna
 import logging
 import pickle
-from arguments import *
-from preprocessor import *
+from arguments import parse_args
+from preprocessor import StockDataset
 from train import *
 
 optuna.logging.set_verbosity(optuna.logging.DEBUG)

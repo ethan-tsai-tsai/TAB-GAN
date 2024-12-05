@@ -1,13 +1,12 @@
 # Import Package
 import os
 import torch
-
+import numpy as np
 # Import file
-from preprocessor import *
-from model import *
-from utils import *
-from arguments import *
 from train import wgan
+from arguments import parse_args
+from preprocessor import StockDataset
+from lib.visulization import plot_predicions
 
 if __name__ == '__main__':
     # set arguments

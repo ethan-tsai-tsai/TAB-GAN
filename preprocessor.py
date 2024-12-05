@@ -1,13 +1,16 @@
+# import packages
 import os
 import torch
-from torch.utils.data import Dataset
 import pickle
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MaxAbsScaler, MinMaxScaler
 from datetime import datetime
-from utils import *
-from arguments import *
+from torch.utils.data import Dataset
+from sklearn.preprocessing import MinMaxScaler
+
+# import file
+from arguments import parse_args
+from lib.calc import TechnicalIndicators
 
 class DataProcessor:
     def __init__(self, args, trial=1):

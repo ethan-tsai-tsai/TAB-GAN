@@ -1,13 +1,17 @@
 import os
 import torch
+import pickle
+import numpy as np
 from torch import nn
-from torch.utils.data import DataLoader, random_split
 from datetime import datetime
+from torch.utils.data import DataLoader, random_split
 # Import file
-from preprocessor import *
 from model import *
-from utils import *
-from arguments import *
+from lib.calc import calc_kld
+from arguments import parse_args
+from preprocessor import StockDataset
+from lib.utils import clear_folder, save_model
+from lib.visulization import plot_predicions, save_loss_curve
 
 class wgan:
     def __init__(self,stock_data, args):
@@ -137,14 +141,13 @@ class wgan:
                 
                 # update best model (use kld)
                 kld = calc_kld(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
-                fid = fid_score(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
                 if kld < self.BEST_KLD and kld != np.inf:
                     self.BEST_KLD = kld
                     if self.args.mode=='train': 
                         file_name = f'./model/{self.args.stock}_{self.args.name}/best.pth'
                         save_model(self.model_d, self.model_g, self.args, file_name)
                         print(f'update best model with kld = {kld}')
-        return total_loss_d, total_loss_g, kld, fid
+        return total_loss_d, total_loss_g, kld
     
     def validation_plot(self, val_datasets, file_name):
         X = torch.tensor(np.array(val_datasets.X), dtype=torch.float32)
