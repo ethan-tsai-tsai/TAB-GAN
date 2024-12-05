@@ -1,8 +1,6 @@
 import os
-import torch
 import pickle
 import numpy as np
-from torch import nn
 from datetime import datetime
 from torch.utils.data import DataLoader, random_split
 # Import file
@@ -13,7 +11,7 @@ from preprocessor import StockDataset
 from lib.visulization import plot_predicions, save_loss_curve
 
 if __name__ == '__main__':
-    
+    # record training time
     start_time = datetime.now()
     
     # set arguments
@@ -26,13 +24,17 @@ if __name__ == '__main__':
         for key, value in saved_args.items():
             if hasattr(args, key):
                 setattr(args, key, value)
+    
+    # prepare dataset
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
+    val_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
+    
     train_size = int(0.95 * len(train_datasets))
     val_size = len(train_datasets) - train_size
     train_data, val_data = random_split(train_datasets, [train_size, val_size])
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
     val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
-    val_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
+    
     wgan_model = wgan(train_datasets, args)
     plot_util = plot_predicions(f'./logs/{args.stock}_{args.name}', args, val_datasets.time_intervals)
     
