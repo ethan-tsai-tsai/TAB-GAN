@@ -68,7 +68,6 @@ class DCCGARCHSimulator:
         self.img_path = f'./img/simulate/{self.args.stock}'
         self.data_path = f'./data/simulated'
         if not os.path.exists(self.img_path): os.mkdir(self.img_path)
-        else: clear_folder(self.img_path)
         
         if not os.path.exists(self.data_path): os.mkdir(self.data_path)
         

@@ -1,6 +1,7 @@
 # import packages
 import os
 import torch
+import pickle
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -9,10 +10,10 @@ from model.mygan import wgan
 from lib.calc import calc_kld
 from arguments import parse_args
 from simulated import DCCGARCHSimulator
+from lib.visulization import plot_predicions
 from preprocessor import DataProcessor, StockDataset
-from lib.visulization import plot_predicions, calc_kld
 
-def calculate_metrics(y_true, y_pred):
+def calculate_metrics(y_true, y_pred, scaler_y):
     """Calculate RMSE, MAE, and KLD for each time step"""
     metrics = []
     
@@ -22,7 +23,13 @@ def calculate_metrics(y_true, y_pred):
         
         rmse = np.sqrt(mean_squared_error(true_dist, pred_dist))
         mae = mean_absolute_error(true_dist, pred_dist)
-        kld = calc_kld(pred_dist, true_dist)
+        
+        scale_true_dist = scaler_y.transform(true_dist.reshape(-1, 1))
+        scale_pred_dist = scaler_y.transform(pred_dist.reshape(-1, 1))
+        scale_true_dist = scale_true_dist.ravel()
+        scale_pred_dist = scale_pred_dist.ravel()
+        
+        kld = calc_kld(scale_pred_dist, scale_true_dist)
         
         metrics.append({
             'time_step': i,
@@ -37,7 +44,7 @@ if __name__ == '__main__':
     # set arguments
     args = parse_args()
     FILE_NAME = f'{args.stock}_{args.name}'
-    check_point = torch.load(f'./model/{FILE_NAME}/final.pth')
+    check_point = torch.load(f'./model_saved/{FILE_NAME}/final.pth')
     args.mode = 'test'
     
     for key, value in check_point['args'].items(): 
@@ -46,15 +53,13 @@ if __name__ == '__main__':
     
     # setting parameters
     device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
-    target_length = args.target_length // args.time_step
+    with open(f'./data/{args.stock}/scaler_y.pkl', 'rb') as f:
+        scaler_y = pickle.load(f)
     
     processor = DataProcessor(args, trial=1)
     test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     time_interval = test_datasets.time_intervals[args.window_size:]
     wgan_model = wgan(test_datasets, args)
-    
-    # load best model and arguments
-    wgan_model.model_g.load_state_dict(check_point['model_g'])
     
     X = torch.tensor(np.array(test_datasets.X), dtype=torch.float32)
     y = np.array(test_datasets.y)
@@ -73,6 +78,7 @@ if __name__ == '__main__':
     simulator = DCCGARCHSimulator(args, data)
     y_trues = simulator.simulate_close(time_interval[0], 1000)
     y_trues = y_trues.groupby('date')['Close'].apply(lambda x: x.values).values
+    y_trues = np.array([i.flatten() for i in y_trues])
     
     all_metrics = []
     for step in range(0, 1):
@@ -81,7 +87,7 @@ if __name__ == '__main__':
         # plot predictions
         plot_util.dist_simulate_plot(y_trues, y_pred, f'{time_interval[0]}_step_{step}')
         # calculate statistics
-        metrics_df = calculate_metrics(y_trues, y_pred)
+        metrics_df = calculate_metrics(y_trues, y_pred, scaler_y)
         metrics_df['prediction_step'] = step
         all_metrics.append(metrics_df)
     

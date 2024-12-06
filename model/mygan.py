@@ -8,7 +8,7 @@ from torch import nn
 # import files
 from lib.calc import calc_kld
 from lib.utils import save_model
-from model.network.mygan import generator, discriminator
+from model.network.mygan_models import generator, discriminator
 
 class wgan:
     def __init__(self,stock_data, args):
