@@ -163,7 +163,7 @@ def save_loss_curve(results, args):
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig(f'./logs/{args.stock}_{args.name}/loss.png')
+    plt.savefig(f'./img/{args.model}/{args.stock}_{args.name}/loss.png')
 
 class plot_predicions:
     def __init__(self, path, args, time_interval):

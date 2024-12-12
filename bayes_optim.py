@@ -42,8 +42,8 @@ def objective(trial):
         # model setup
         wgan_model = wgan(train_datasets, args)
         _ = wgan_model.train(train_loader, val_loader)
-        _, _, test_kld, test_fid = wgan_model.validation(test_loader)
-        _, _, val_kld, val_fid = wgan_model.validation(val_loader)
+        _, _, test_kld = wgan_model.validation(test_loader)
+        _, _, val_kld = wgan_model.validation(val_loader)
         test_score = test_kld
         val_score = val_kld
         alpha = 0.7
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     for key, value in trial.params.items():
         print('    {}: {}'.format(key, value))
     
-    with open(f'./model/{args.stock}_{args.name}/bayes_args.pkl', 'wb') as f:
+    with open(f'./model_saved/{args.model}/{args.stock}_{args.name}/bayes_args.pkl', 'wb') as f:
         pickle.dump(trial.params, f)
         
     end_time = datetime.now()

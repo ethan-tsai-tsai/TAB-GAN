@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.special import rel_entr
 
-def calc_kld(generated_data, ground_truth, bins=50, epsilon=1e-10):
+def calc_kld(generated_data, ground_truth, bins=100, epsilon=1e-10):
     y_true = np.array(ground_truth)
     y_pred = np.array(generated_data)
     min_val = min(np.min(y_true), np.min(y_pred))

@@ -8,7 +8,7 @@ from torch import nn
 # import files
 from lib.calc import calc_kld
 from lib.utils import save_model
-from model.network.mygan_models import generator, discriminator
+from model.algos.mygan_models import generator, discriminator
 
 class wgan:
     def __init__(self,stock_data, args):
@@ -112,7 +112,7 @@ class wgan:
         # load parameters
         with open(f'./data/{self.args.stock}/scaler_y.pkl', 'rb') as f:
             scaler_y = pickle.load(f)
-        check_point = torch.load(f'./model_saved/{self.FOLDER_NAME}/final.pth')
+        check_point = torch.load(f'./model_saved/{self.args.model}/{self.FOLDER_NAME}/final.pth')
         self.model_g.load_state_dict(check_point['model_g'])
         
         # prediction

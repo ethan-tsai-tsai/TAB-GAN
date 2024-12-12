@@ -44,7 +44,7 @@ if __name__ == '__main__':
     # set arguments
     args = parse_args()
     FILE_NAME = f'{args.stock}_{args.name}'
-    check_point = torch.load(f'./model_saved/{FILE_NAME}/final.pth')
+    check_point = torch.load(f'./model_saved/{args.model}/{FILE_NAME}/final.pth')
     args.mode = 'test'
     
     for key, value in check_point['args'].items(): 

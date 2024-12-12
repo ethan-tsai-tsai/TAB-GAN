@@ -32,7 +32,11 @@ def run_trial(args, trial):
         print(f"執行 {script}")
         try:
             process = Popen(
-                [sys.executable, script, '--stock', args.stock, '--name', args.name, '--cuda', str(args.cuda)],
+                [sys.executable, script,
+                 '--model', args.model,
+                 '--stock', args.stock,
+                 '--name', args.name,
+                 '--cuda', str(args.cuda)],
                 stdout=PIPE,
                 stderr=PIPE,
                 bufsize=1,

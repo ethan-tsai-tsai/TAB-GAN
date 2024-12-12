@@ -14,7 +14,6 @@ from rpy2.robjects.packages import importr
 # import files
 from arguments import parse_args
 from preprocessor import DataProcessor
-from lib.utils import clear_folder
 
 warnings.filterwarnings('ignore')
 

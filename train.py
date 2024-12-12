@@ -5,10 +5,11 @@ from datetime import datetime
 from torch.utils.data import DataLoader, random_split
 # Import file
 from model.mygan import wgan
+from model.rcgan import RCGAN
 from arguments import parse_args
 from lib.utils import save_model
 from preprocessor import StockDataset
-from lib.visulization import plot_predicions, save_loss_curve
+from lib.visulization import save_loss_curve
 
 if __name__ == '__main__':
     # record training time
@@ -17,7 +18,8 @@ if __name__ == '__main__':
     # set arguments
     args = parse_args()
     args.mode = 'train'
-    file_name = f'./model_saved/{args.stock}_{args.name}/bayes_args.pkl'
+    model_path = f'./model_saved/{args.model}/{args.stock}_{args.name}'
+    file_name = f'{model_path}/bayes_args.pkl'
     if os.path.exists(file_name):
         with open(file_name, 'rb') as f:
             saved_args = pickle.load(f)
@@ -25,6 +27,13 @@ if __name__ == '__main__':
             if hasattr(args, key):
                 setattr(args, key, value)
     
+    # set dirs
+    if not os.path.exists(f'./model_saved'): os.makedirs('./model_saved')
+    if not os.path.exists(f'./model_saved/{args.model}'): os.makedirs(f'./model_saved/{args.model}')
+    if not os.path.exists(model_path): os.makedirs(model_path)
+    if not os.path.exists('./img'): os.makedirs('./img')
+    if not os.path.exists(f'./img/{args.model}'): os.makedirs(f'./img/{args.model}')
+    if not os.path.exists(f'./img/{args.model}/{args.stock}_{args.name}'): os.makedirs(f'./img/{args.model}/{args.stock}_{args.name}')
     # prepare dataset
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
     val_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
@@ -35,8 +44,10 @@ if __name__ == '__main__':
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
     val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
     
-    wgan_model = wgan(train_datasets, args)
-    plot_util = plot_predicions(f'./logs/{args.stock}_{args.name}', args, val_datasets.time_intervals)
+    if args.model == 'mygan':
+        model = wgan(train_datasets, args)
+    elif args.model == 'rcgan':
+        model = RCGAN(train_datasets, args)
     
     print('----------------------------------------------------------------')
     print('Start training...')
@@ -50,10 +61,9 @@ if __name__ == '__main__':
     for k, v in vars(args).items():
         if k in filter_val: print("{}:\t{}".format(k, v))
     print('----------------------------------------------------------------')
-    results = wgan_model.train(train_loader, val_loader)
+    results = model.train(train_loader, val_loader)
     save_loss_curve(results, args)
-    file_name = f'./model/{args.stock}_{args.name}/final.pth'
-    save_model(wgan_model.model_d, wgan_model.model_g, args, file_name)
+    save_model(model.model_d, model.model_g, args, f'{model_path}/final.pth')
     
     end_time = datetime.now()
     training_time = (end_time - start_time).seconds

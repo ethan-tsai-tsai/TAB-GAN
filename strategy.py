@@ -23,7 +23,7 @@ class TradingAnalysis:
         
     def load_model_args(self) -> None:
         """載入模型參數"""
-        checkpoint = torch.load(f'./model_saved/{self.FILE_NAME}/final.pth')
+        checkpoint = torch.load(f'./model_saved/{args.model}/{self.FILE_NAME}/final.pth')
         for key, value in checkpoint['args'].items(): 
             if key not in ['pred_times', 'bound_percent']:
                 setattr(self.args, key, value)
