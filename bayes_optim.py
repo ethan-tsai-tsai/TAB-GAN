@@ -7,7 +7,7 @@ from preprocessor import StockDataset
 from train import *
 
 optuna.logging.set_verbosity(optuna.logging.DEBUG)
-def objective(trial):
+def mygan_objective(trial):
     try:
         # set hyperparameters
         args.mode = 'optim' # optim mode
@@ -53,7 +53,37 @@ def objective(trial):
         logging.error(f"Error in trial {trial.number}: {e}")
         raise optuna.exceptions.TrialPruned()  # Better handling of failed trials
         
-    
+def forgan_objective(trial):
+    try:
+        # set hyperparameters
+        args.mode = 'optim' # optim mode
+        # data
+        args.cell_type = trial.suggest_categorical('t', ['gru', 'lstm'])
+        # model
+        args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [1, 2, 4, 8, 16, 32, 64, 128, 256])
+        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [1, 2, 4, 8, 16, 32, 64, 128, 256])
+        args.noise_dim = trial.suggest_categorical('noise_dim', [1, 2, 4, 8, 16, 32])
+        args.d_iter = trial.suggest_int('d_iter', 1, 7)
+
+        args.epoch = 1000
+        args.batch_size = 1000
+        args.lr_g = 0.001
+        args.lr_d = 0.001
+        # prepare dataset
+        train_dataset = StockDataset(args, f'./data/{args.stock}/train.csv')
+        test_dataset = StockDataset(args, f'./data/{args.stock}/test.csv')
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+        
+        print(f'Starting trial with params: {trial.params}')
+        # model setup
+        forgan = ForGAN(train_dataset, args)
+        forgan.train(train_dataset, test_dataset)
+        _, _, test_kld = forgan.predict(test_loader)
+        score = test_kld
+        return score
+    except Exception as e: 
+        logging.error(f"Error in trial {trial.number}: {e}")
+        return float('inf')
 
 if __name__ == '__main__':
     
@@ -65,7 +95,11 @@ if __name__ == '__main__':
     if not os.path.exists(model_path): os.makedirs(model_path)
     
     study = optuna.create_study(direction='minimize')
-    study.optimize(objective, n_trials=10)
+    if args.model in ['mygan', 'rcgan']:
+        study.optimize(mygan_objective, n_trials=10)
+    elif args.model == 'forgan':
+        study.optimize(forgan_objective, n_trials=10)
+    
     print('Best trial:')
     trial = study.best_trial
     print('  Value: {}'.format(trial.value))

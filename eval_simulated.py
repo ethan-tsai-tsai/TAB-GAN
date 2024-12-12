@@ -7,6 +7,8 @@ import pandas as pd
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 # import file
 from model.mygan import wgan
+from model.rcgan import RCGAN
+from model.forgan import ForGAN
 from lib.calc import calc_kld
 from arguments import parse_args
 from simulated import DCCGARCHSimulator
@@ -82,7 +84,9 @@ if __name__ == '__main__':
     processor = DataProcessor(args, trial=int(args.name[-1]))
     test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     time_interval = test_datasets.time_intervals[args.window_size:]
-    wgan_model = wgan(test_datasets, args)
+    if args.model == 'mygan': model = wgan(test_datasets, args)
+    elif args.model == 'forgan': model = ForGAN(test_datasets, args)
+    elif args.model == 'rcgan': model = RCGAN(test_datasets, args)
     
     X = torch.tensor(np.array(test_datasets.X), dtype=torch.float32)
     y = np.array(test_datasets.y)
@@ -91,7 +95,7 @@ if __name__ == '__main__':
     plot_util = plot_predicions(path=f'./img/simulated_dist/{args.model}/{FILE_NAME}', args=args, time_interval=time_interval)
     
     # get predictions
-    y_preds, _ = wgan_model.predict(X, y)
+    y_preds, _ = model.predict(X, y)
     
     # get data
     args.stock = args.stock.replace('_simulated', '')

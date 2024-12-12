@@ -60,6 +60,6 @@ def run_trial(args, trial):
 if __name__ == "__main__":
     args = parse_args()
     args.mode = 'test'
-    num_trials = 1
+    num_trials = 3
     for i in range(1, num_trials + 1):
         run_trial(args, i)

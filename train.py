@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, random_split
 # Import file
 from model.mygan import wgan
 from model.rcgan import RCGAN
+from model.forgan import ForGAN
 from arguments import parse_args
 from preprocessor import StockDataset
 
@@ -46,6 +47,8 @@ if __name__ == '__main__':
         model = wgan(train_datasets, args)
     elif args.model == 'rcgan':
         model = RCGAN(train_datasets, args)
+    elif args.model == 'forgan':
+        model = ForGAN(train_datasets, args)
     
     print('----------------------------------------------------------------')
     print('Start training...')
@@ -59,7 +62,11 @@ if __name__ == '__main__':
     for k, v in vars(args).items():
         if k in filter_val: print("{}:\t{}".format(k, v))
     print('----------------------------------------------------------------')
-    results = model.train(train_loader, val_loader)
+    if args.model in ['mygan', 'rcgan']:
+        results = model.train(train_loader, val_loader)
+    elif args.model == 'forgan':
+        model.train(train_datasets, val_datasets)
+    
     end_time = datetime.now()
     training_time = (end_time - start_time).seconds
     print(f'Training time: {training_time//3600}:{(training_time%3600)//60}:{training_time%60}')

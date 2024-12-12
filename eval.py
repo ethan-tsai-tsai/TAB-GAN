@@ -5,6 +5,7 @@ import numpy as np
 # Import file
 from model.mygan import wgan
 from model.rcgan import RCGAN
+from model.forgan import ForGAN
 from arguments import parse_args
 from preprocessor import StockDataset
 from lib.visulization import plot_predicions
@@ -28,6 +29,8 @@ if __name__ == '__main__':
     
     if args.model == 'mygan': model = wgan(test_datasets, args)
     elif args.model == 'rcgan': model = RCGAN(test_datasets, args)
+    elif args.model == 'forgan': model = ForGAN(test_datasets, args)
+    
     # load best model and arguments
     model.model_g.load_state_dict(check_point['model_g'])
     

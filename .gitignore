@@ -3,7 +3,6 @@ data/*
 img/*
 model_saved/*
 out/*
-logs/*
 res/*
 .command.sh
 .Rhistory
