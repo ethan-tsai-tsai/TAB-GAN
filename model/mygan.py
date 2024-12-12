@@ -8,6 +8,7 @@ from torch import nn
 # import files
 from lib.calc import calc_kld
 from lib.utils import save_model
+from lib.visulization import save_loss_curve
 from model.algos.mygan_models import generator, discriminator
 
 class wgan:
@@ -16,12 +17,10 @@ class wgan:
         self.device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'
         self.model_d = discriminator(stock_data.num_features - 1, 1, self.device, self.args).to(self.device)
         self.model_g = generator(stock_data.num_features - 1, self.device, self.args).to(self.device)
-        self.BEST_KLD = np.inf
 
-        # initialize folder
-        self.FOLDER_NAME = f'{args.stock}_{args.name}'
-        if not os.path.exists(f'model_saved/{self.FOLDER_NAME}'):os.makedirs(f'model_saved/{self.FOLDER_NAME}')
-        
+        self.model_path = f'./model_saved/{args.model}/{args.stock}_{args.name}'
+        img_path = f'./img/model_saved/{args.model}/{args.stock}_{args.name}'
+        if not os.path.exists(img_path): os.makedirs(img_path)
     def train(self, train_loader, val_loader):
         # training set
         optimizer_d = torch.optim.AdamW(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
@@ -73,7 +72,10 @@ class wgan:
             
             if (epoch+1)%(self.args.epoch//10)==0:
                 print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
-                
+            
+        # save model
+        save_model(self.model_d, self.model_g, self.args, f'{self.model_path}/final.pth')
+        if self.args.mode == 'train': save_loss_curve(results, self.args)
         return results
     
     def validation(self, val_loader):
@@ -100,19 +102,14 @@ class wgan:
                 
                 # update best model (use kld)
                 kld = calc_kld(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
-                if kld < self.BEST_KLD and kld != np.inf:
-                    self.BEST_KLD = kld
-                    if self.args.mode=='train': 
-                        file_name = f'./model_saved/{self.args.stock}_{self.args.name}/best.pth'
-                        save_model(self.model_d, self.model_g, self.args, file_name)
-                        print(f'update best model with kld = {kld}')
+                
         return total_loss_d, total_loss_g, kld
         
     def predict(self, X, y=None):
         # load parameters
         with open(f'./data/{self.args.stock}/scaler_y.pkl', 'rb') as f:
             scaler_y = pickle.load(f)
-        check_point = torch.load(f'./model_saved/{self.args.model}/{self.FOLDER_NAME}/final.pth')
+        check_point = torch.load(f'{self.model_path}/final.pth')
         self.model_g.load_state_dict(check_point['model_g'])
         
         # prediction

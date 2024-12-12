@@ -1,9 +1,11 @@
+import os
 import torch
 import pickle
 import numpy as np
 from torch import nn
 from lib.calc import calc_kld
 from lib.utils import save_model
+from lib.visulization import save_loss_curve
 from model.algos.rcgan_models import Generator, Discriminator
 
 class RCGAN:
@@ -30,8 +32,9 @@ class RCGAN:
         self.device = device
         self.noise_dim = args.noise_dim
         self.args = args
-        self.BEST_KLD = np.inf
-
+        
+        self.model_path = f'./model_saved/{args.model}/{args.stock}_{args.name}'
+        
     def train(self, train_loader, val_loader):
         results = {'loss_d': [], 'loss_g': [], 'test_loss_d': [], 'test_loss_g': [], 'test_kld': []}
         for epoch in range(self.args.epoch):
@@ -79,7 +82,10 @@ class RCGAN:
             
             if (epoch+1)%(self.args.epoch//10)==0:
                 print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
-                
+        
+        # save model
+        save_model(self.model_d, self.model_g, self.args, f'{self.model_path}/final.pth')
+        if self.args.mode == 'train': save_loss_curve(results, self.args)
         return results
 
     def validation(self, val_loader):
@@ -115,8 +121,7 @@ class RCGAN:
                 
                 # update best model (use kld)
                 kld = calc_kld(fake_output.cpu().detach().numpy(), real_sequence.cpu().detach().numpy())
-                if kld < self.BEST_KLD and kld != np.inf:
-                    self.BEST_KLD = kld
+                
         return total_loss_d, total_loss_g, kld
     
     def predict(self, condition, real_sequence):

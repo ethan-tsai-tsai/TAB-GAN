@@ -7,8 +7,8 @@ def calc_kld(generated_data, ground_truth, bins=100, epsilon=1e-10):
     min_val = min(np.min(y_true), np.min(y_pred))
     max_val = max(np.max(y_true), np.max(y_pred))
 
-    hist_true, edges = np.histogram(y_true, bins=bins, range=(min_val, max_val), density=True)
-    hist_pred, _ = np.histogram(y_pred, bins=edges, density=True)
+    hist_true, edges = np.histogram(y_true, bins=bins, range=(min_val, max_val))
+    hist_pred, _ = np.histogram(y_pred, bins=edges)
 
     hist_true = hist_true + epsilon
     hist_pred = hist_pred + epsilon

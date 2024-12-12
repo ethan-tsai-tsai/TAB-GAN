@@ -60,6 +60,10 @@ if __name__ == '__main__':
     start_time = datetime.now()
     
     args = parse_args()
+    model_path = f'./model_saved/{args.model}/{args.stock}_{args.name}'
+    if not os.path.exists(f'./model_saved/{args.model}'): os.makedirs(f'./model_saved/{args.model}')
+    if not os.path.exists(model_path): os.makedirs(model_path)
+    
     study = optuna.create_study(direction='minimize')
     study.optimize(objective, n_trials=10)
     print('Best trial:')
@@ -69,7 +73,7 @@ if __name__ == '__main__':
     for key, value in trial.params.items():
         print('    {}: {}'.format(key, value))
     
-    with open(f'./model_saved/{args.model}/{args.stock}_{args.name}/bayes_args.pkl', 'wb') as f:
+    with open(f'{model_path}/bayes_args.pkl', 'wb') as f:
         pickle.dump(trial.params, f)
         
     end_time = datetime.now()

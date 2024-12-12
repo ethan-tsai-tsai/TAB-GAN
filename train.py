@@ -7,9 +7,7 @@ from torch.utils.data import DataLoader, random_split
 from model.mygan import wgan
 from model.rcgan import RCGAN
 from arguments import parse_args
-from lib.utils import save_model
 from preprocessor import StockDataset
-from lib.visulization import save_loss_curve
 
 if __name__ == '__main__':
     # record training time
@@ -62,9 +60,6 @@ if __name__ == '__main__':
         if k in filter_val: print("{}:\t{}".format(k, v))
     print('----------------------------------------------------------------')
     results = model.train(train_loader, val_loader)
-    save_loss_curve(results, args)
-    save_model(model.model_d, model.model_g, args, f'{model_path}/final.pth')
-    
     end_time = datetime.now()
     training_time = (end_time - start_time).seconds
     print(f'Training time: {training_time//3600}:{(training_time%3600)//60}:{training_time%60}')

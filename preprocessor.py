@@ -126,8 +126,8 @@ class DataProcessor:
         scaler_y = MinMaxScaler(feature_range=(-1, 1))
         train_dataframe[col_list] = scaler_X.fit_transform(train_dataframe[col_list].values)
         train_dataframe['y'] = scaler_y.fit_transform(train_dataframe[['y']].values)
-        test_dataframe[col_list] = scaler_X.fit_transform(test_dataframe[col_list].values)
-        test_dataframe['y'] = scaler_y.fit_transform(test_dataframe[['y']].values)
+        test_dataframe[col_list] = scaler_X.transform(test_dataframe[col_list].values)
+        test_dataframe['y'] = scaler_y.transform(test_dataframe[['y']].values)
         
         # save scaler and data
         with open(f'{path}/scaler_X.pkl', 'wb') as f:

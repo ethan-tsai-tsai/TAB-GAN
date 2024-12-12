@@ -6,8 +6,6 @@ import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-# import file
-from lib.utils import clear_folder
 
 def visualize_band(args):
     if not os.path.exists('./img/trading_signals'): os.makedirs('./img/trading_signals')
@@ -175,8 +173,7 @@ class plot_predicions:
         self.time_interval = time_interval
         # check folder exists
         if self.args.mode != 'trial':
-            if not os.path.exists(self.path): os.makedirs(path)
-            else: clear_folder(self.path)
+            if not os.path.exists(self.path): os.makedirs(path, exist_ok=True)
     
     def dist_plot(self, y_true, y_pred):
         # process array

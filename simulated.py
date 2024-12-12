@@ -4,6 +4,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import pickle
 import rpy2.robjects as ro
 from typing import Optional
 from prophet import Prophet
@@ -319,37 +320,57 @@ class DCCGARCHSimulator:
         simulated_data = self.format_simulated_data(simulated_data)
         return simulated_data
     
-    def simulate_close(self, target_date: str, n_simulations: int = 1000) -> pd.DataFrame:
+    def simulate_close(self, time_interval, n_simulations: int = 1000) -> pd.DataFrame:
         """模擬單一時間點的收盤價"""
         # 生成時間點列表
-        time_points = [
-            pd.Timestamp(f"{target_date} 09:01:00"),
-            pd.Timestamp(f"{target_date} 09:31:00"),
-            pd.Timestamp(f"{target_date} 10:01:00"),
-            pd.Timestamp(f"{target_date} 10:31:00"),
-            pd.Timestamp(f"{target_date} 11:01:00"),
-            pd.Timestamp(f"{target_date} 11:31:00"),
-            pd.Timestamp(f"{target_date} 12:01:00"),
-            pd.Timestamp(f"{target_date} 12:31:00"),
-            pd.Timestamp(f"{target_date} 13:01:00"),
-        ]
+        time_points = []
+        for target_date in time_interval:
+            daily_points = [
+                pd.Timestamp(f"{target_date} 09:01:00"),
+                pd.Timestamp(f"{target_date} 09:31:00"),
+                pd.Timestamp(f"{target_date} 10:01:00"),
+                pd.Timestamp(f"{target_date} 10:31:00"),
+                pd.Timestamp(f"{target_date} 11:01:00"),
+                pd.Timestamp(f"{target_date} 11:31:00"),
+                pd.Timestamp(f"{target_date} 12:01:00"),
+                pd.Timestamp(f"{target_date} 12:31:00"),
+                pd.Timestamp(f"{target_date} 13:01:00"),
+            ]
+            time_points.extend(daily_points)
         
         simulated_closes = []
         dates = []
         
-        self.decompose_series()
-        self.fit_dcc_garch()
+        file_path = f'./model_saved/simulator'
+        model_path = f'{file_path}/{self.args.stock}_simulator.pth'
+        if not os.path.exists(model_path):
+            # 如果模型不存在，訓練並保存
+            os.makedirs(file_path, exist_ok=True)
+            self.decompose_series()
+            self.fit_dcc_garch()
+            self.save(model_path)
+            simulator = self
+        else:
+            # 如果模型存在，載入並更新當前實例的屬性
+            loaded_simulator = self.load(model_path)
+            # 更新當前實例的所有必要屬性
+            self.prophet_models = loaded_simulator.prophet_models
+            self.decomposition = loaded_simulator.decomposition
+            self.dcc_fit = loaded_simulator.dcc_fit
+            self.price_stats = loaded_simulator.price_stats
+            self.transform_params = loaded_simulator.transform_params
+            simulator = self
         
         # 預測每個時間點
         for time_point in time_points:
             df_for_prophet = pd.DataFrame({'ds': [time_point]})
-            forecast = self.prophet_models['Close'].predict(df_for_prophet)
+            forecast = simulator.prophet_models['Close'].predict(df_for_prophet)
             trend = forecast['trend'].values[0]
             seasonal = (forecast['yearly'] + forecast['weekly'] + forecast['daily']).values[0]
             
             # 對每個時間點進行n_simulations次模擬
             for _ in range(n_simulations):
-                residuals = self.simulate_dcc_garch(1)[0]
+                residuals = simulator.simulate_dcc_garch(1)[0]
                 close_price = trend + seasonal + residuals[3]
                 simulated_closes.append(close_price)
                 dates.append(time_point)
@@ -718,6 +739,52 @@ class DCCGARCHSimulator:
         
         # 繪製所有季節性圖
         self.plot_seasonal_components()
+        
+    def save(self, filepath: str) -> None:
+        # 暫時存儲 R 物件
+        dcc_fit_temp = self.dcc_fit
+        self.dcc_fit = None
+        
+        # 儲存其他所有狀態
+        save_dict = {
+            'args': self.args,
+            'data': self.data,
+            'fit_columns': self.fit_columns,
+            'n_series': self.n_series,
+            'epsilon': self.epsilon,
+            'prophet_models': self.prophet_models,
+            'decomposition': self.decomposition,
+            'price_stats': self.price_stats,
+            'transform_params': self.transform_params
+        }
+        
+        with open(filepath, 'wb') as f:
+            pickle.dump(save_dict, f)
+            
+        # 還原 R 物件
+        self.dcc_fit = dcc_fit_temp
+    
+    @classmethod
+    def load(cls, filepath: str) -> 'DCCGARCHSimulator':
+        with open(filepath, 'rb') as f:
+            save_dict = pickle.load(f)
+            
+        # 創建新實例
+        simulator = cls(save_dict['args'], save_dict['data'])
+        
+        # 恢復狀態
+        simulator.fit_columns = save_dict['fit_columns']
+        simulator.n_series = save_dict['n_series']
+        simulator.epsilon = save_dict['epsilon']
+        simulator.prophet_models = save_dict['prophet_models']
+        simulator.decomposition = save_dict['decomposition']
+        simulator.price_stats = save_dict['price_stats']
+        simulator.transform_params = save_dict['transform_params']
+        
+        # 需要重新初始化 R 環境和擬合 DCC-GARCH
+        simulator.fit_dcc_garch()
+        
+        return simulator
 
 if __name__ == '__main__':
     # 初始化模擬器
@@ -728,11 +795,16 @@ if __name__ == '__main__':
 
     simulator = DCCGARCHSimulator(args, data)
 
-    # 進行分解和擬合
+    # fit model
     simulator.decompose_series()
     simulator.plot_all_components()
     simulator.fit_dcc_garch()
 
+    # save model
+    file_path = f'./model_saved/simulator'
+    if not os.path.exists(file_path): os.makedirs(file_path)
+    simulator.save(f'{file_path}/{args.stock}_simulator.pth')
+    
     # 生成模擬數據
     simulated_data = simulator.simulate(seed=42)
     simulated_data.to_csv(f'./data/simulated/{args.stock}_simulated.csv')

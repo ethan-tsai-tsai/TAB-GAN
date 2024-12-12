@@ -31,7 +31,7 @@ def parse_args():
     parser.add_argument('--gp_lambda', type=float, default=5, help='lambda of gradient penalty')
     
     # Evaluation
-    parser.add_argument('--pred_times', type=int, default=10, help='prediction time in one time point')
+    parser.add_argument('--pred_times', type=int, default=100, help='prediction time in one time point')
     parser.add_argument('--bound_percent', type=float, default=90, help='confidence of bound')
     
     args = parser.parse_args()
