@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument('--num_head_d', type=int, default=8, help='self attention head')
     
     ## forgan
-    parser.add_argument("-t", metavar='', dest="cell_type", type=str, default="gru", help="The type of cells : lstm or gru")
+    parser.add_argument("--cell_type", type=str, default="gru", help="The type of cells : lstm or gru")
     
     # Train
     parser.add_argument('--lr_g', type=float, default=0.00005, help='generator learning rate')

@@ -58,7 +58,7 @@ def forgan_objective(trial):
         # set hyperparameters
         args.mode = 'optim' # optim mode
         # data
-        args.cell_type = trial.suggest_categorical('t', ['gru', 'lstm'])
+        args.cell_type = trial.suggest_categorical('cell_type', ['gru', 'lstm'])
         # model
         args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [1, 2, 4, 8, 16, 32, 64, 128, 256])
         args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [1, 2, 4, 8, 16, 32, 64, 128, 256])

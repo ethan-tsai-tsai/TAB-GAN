@@ -6,8 +6,7 @@ import torch
 from torch import nn
 
 from lib.calc import calc_kld
-from arguments import parse_args
-from preprocessor import StockDataset
+from lib.utils import save_model
 from model.algos.forgan_models import Generator, Discriminator
 # Fixing random seeds
 torch.manual_seed(1368)
@@ -25,14 +24,14 @@ class ForGAN:
         self.model_g = Generator(noise_size=args.noise_dim,
                                    condition_size=stock_data.num_features - 1,
                                    generator_latent_size=args.hidden_dim_g,
-                                   cell_type='gru',
+                                   cell_type=self.args.cell_type,
                                    mean=data_mean,
                                    std=data_std)
 
 
         self.model_d = Discriminator(condition_size=stock_data.num_features - 1,
                                            discriminator_latent_size=args.hidden_dim_d,
-                                           cell_type='gru',
+                                           cell_type=self.args.cell_type,
                                            mean=data_mean,
                                            std=data_std)
 
@@ -108,10 +107,7 @@ class ForGAN:
                 best_kld = kld
                 print("step : {} , KLD : {}, RMSE : {}".format(step, best_kld,
                                                                np.sqrt(np.square(preds - y_val.flatten()).mean())))
-                torch.save({
-                    'g_state_dict': self.model_g.state_dict(),
-                    'args': self.args
-                }, "./{}/best.pth".format(self.model_path))
+                save_model(self.model_d, self.model_g, self.args, f'./{self.model_path}/final.pth')
             
             if step % 100 == 0:
                 print("step : {} , d_loss : {} , g_loss : {}".format(step, d_loss, g_loss))
