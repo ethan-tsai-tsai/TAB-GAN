@@ -78,7 +78,7 @@ def forgan_objective(trial):
         # model setup
         forgan = ForGAN(train_dataset, args)
         forgan.train(train_dataset, test_dataset)
-        _, _, test_kld = forgan.predict(test_loader)
+        _, _, test_kld = forgan.validation(test_loader)
         score = test_kld
         return score
     except Exception as e: 
