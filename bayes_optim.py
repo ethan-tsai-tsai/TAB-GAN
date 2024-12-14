@@ -65,10 +65,11 @@ def forgan_objective(trial):
         args.noise_dim = trial.suggest_categorical('noise_dim', [1, 2, 4, 8, 16, 32])
         args.d_iter = trial.suggest_int('d_iter', 1, 7)
 
-        args.epoch = 1000
-        args.batch_size = 1000
-        args.lr_g = 0.001
-        args.lr_d = 0.001
+        args.epoch = trial.suggest_int('epoch', 1000, 1000)
+        args.batch_size = trial.suggest_int('batch_size', 1000, 1000)
+        args.lr_g = trial.suggest_float('lr_g', 1e-3, 1e-3, log=True)
+        args.lr_d = trial.suggest_float('lr_d', 1e-3, 1e-3, log=True)
+        
         # prepare dataset
         train_dataset = StockDataset(args, f'./data/{args.stock}/train.csv')
         test_dataset = StockDataset(args, f'./data/{args.stock}/test.csv')

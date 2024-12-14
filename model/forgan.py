@@ -39,7 +39,7 @@ class ForGAN:
         self.model_d = self.model_d.to(self.device)
         
         self.model_path = f'./model_saved/{args.model}/{args.stock}_{args.name}'
-        img_path = f'./img/model_saved/{args.model}/{args.stock}_{args.name}'
+        img_path = f'./img/{args.model}/{args.stock}_{args.name}'
         if not os.path.exists(img_path): os.makedirs(img_path)
     def train(self, train_dataset, test_dataset):
         x_train = np.array(train_dataset.X)
@@ -113,6 +113,8 @@ class ForGAN:
                 print("step : {} , d_loss : {} , g_loss : {}".format(step, d_loss, g_loss))
 
     def validation(self, val_loader):
+        adversarial_loss = nn.BCELoss()
+        adversarial_loss = adversarial_loss.to(self.device)
         self.model_g.eval()
         with torch.inference_mode():
             total_loss_d, total_loss_g = 0, 0
@@ -121,21 +123,32 @@ class ForGAN:
                 # add noise
                 self.model_g.eval()
                 self.model_d.eval()
-                
+                d_loss = 0
                 # evaluate discriminator
-                noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                fake_data = self.model_g(X, noise)
-                loss_d = self._discriminator_loss(X, y, fake_data, 0)
-                total_loss_d += loss_d.cpu().detach().numpy()
+                d_real_decision = self.model_d(y, X)
+                d_real_loss = adversarial_loss(d_real_decision,
+                                               torch.full_like(d_real_decision, 1, device=self.device))
+                
+                d_loss += d_real_loss.detach().cpu().numpy()
+                # train discriminator on fake data
+                noise_batch = torch.tensor(rs.normal(0, 1, (X.size(0), self.args.noise_dim)),
+                                           device=self.device, dtype=torch.float32)
+                x_fake = self.model_g(noise_batch, X).detach()
+                d_fake_decision = self.model_d(x_fake, X)
+                d_fake_loss = adversarial_loss(d_fake_decision,
+                                               torch.full_like(d_fake_decision, 0, device=self.device))
+                d_loss += d_fake_loss
+                total_loss_d += d_loss.detach().cpu().numpy()
                 
                 # evaluate generator
-                noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                fake_data = self.model_g(X, noise)
-                loss_g = self._generator_loss(X, fake_data)
-                total_loss_g += loss_g.cpu().detach().numpy()
-                
+                noise_batch = torch.tensor(rs.normal(0, 1, (X.size(0), self.args.noise_dim)), device=self.device,
+                                       dtype=torch.float32)
+                x_fake = self.model_g(noise_batch, X)
+                d_g_decision = self.model_d(x_fake, X)
+                g_loss = -1 * adversarial_loss(d_g_decision, torch.full_like(d_g_decision, 0, device=self.device))
+                total_loss_g += g_loss
                 # update best model (use kld)
-                kld = calc_kld(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
+                kld = calc_kld(x_fake.cpu().detach().numpy(), y.cpu().detach().numpy())
                 
         return total_loss_d, total_loss_g, kld
     
@@ -153,7 +166,7 @@ class ForGAN:
             X = X.to(self.device)
             for _ in range(self.args.pred_times):
                 noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
-                y_pred = self.model_g(X, noise).cpu().detach().numpy()
+                y_pred = self.model_g(noise, X).cpu().detach().numpy()
                 y_pred = scaler_y.inverse_transform(y_pred) 
                 y_pred = np.expand_dims(y_pred, axis=2)
                 y_preds = y_pred if y_preds.size==0 else np.concatenate((y_preds, y_pred), axis=2)

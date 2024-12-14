@@ -2,10 +2,10 @@ import os
 import torch
  
 def save_model(model_d, model_g, args, file_name):
-    filter_val = ['noise_dim', 
+    filter_val = ['cell_type', 'noise_dim', 
                   'epoch', 'batch_size', 
-                  'hidden_dim_g', 'num_layers_g', 'lr_g',
-                  'hidden_dim_d', 'num_layers_d', 'lr_d',
+                  'hidden_dim_g', 'num_layers_g', 'num_head_g', 'lr_g',
+                  'hidden_dim_d', 'num_layers_d', 'num_head_d', 'lr_d',
                   'd_iter', 'gp_lambda']
     args = {key:value for key, value in vars(args).items() if key in filter_val}
     torch.save({

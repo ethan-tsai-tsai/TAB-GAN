@@ -60,7 +60,7 @@ def run_trial(args, trial):
 if __name__ == "__main__":
     args = parse_args()
     args.mode = 'test'
-    for model in ['forgan', 'rcgan']:
+    for model in ['mygan', 'forgan', 'rcgan']:
         args.model = model
         print(f'fitting model: {model}')
         num_trials = 3
