@@ -13,7 +13,7 @@ from lib.calc import calc_kld
 from arguments import parse_args
 from simulated import DCCGARCHSimulator
 from lib.visulization import plot_predicions
-from preprocessor import DataProcessor, StockDataset
+from lib.data import DataProcessor, StockDataset
 
 def reshape_prediction_data(df):
     # Convert date column to datetime

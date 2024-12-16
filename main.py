@@ -61,6 +61,4 @@ if __name__ == "__main__":
     args = parse_args()
     args.mode = 'test'
     print(f'fitting model: {args.model}')
-    num_trials = 3
-    for i in range(1, num_trials + 1):
-        run_trial(args, i)
+    run_trial(args, trial=1)

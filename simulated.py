@@ -14,7 +14,7 @@ from rpy2.robjects.packages import importr
 
 # import files
 from arguments import parse_args
-from preprocessor import DataProcessor
+from lib.data import DataProcessor
 
 warnings.filterwarnings('ignore')
 
@@ -543,8 +543,8 @@ class DCCGARCHSimulator:
     def validate_volume_amount(self, simulated_data: pd.DataFrame) -> None:
         """驗證Volume和Amount之間的關係"""
         # 計算原始數據和模擬數據的平均價格
-        orig_avg_price = self.data['Amount'] / self.data['Volume']
-        sim_avg_price = simulated_data['Amount'] / simulated_data['Volume']
+        orig_avg_price = self.data['Amount'] / (self.data['Volume'] + 1e-10)
+        sim_avg_price = simulated_data['Amount'] / (simulated_data['Volume'] + 1e-10)
         
         print("\nPrice Statistics:")
         print("Original Data:")

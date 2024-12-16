@@ -6,3 +6,5 @@ out/*
 res/*
 .command.sh
 .Rhistory
+temp.py
+trial.py

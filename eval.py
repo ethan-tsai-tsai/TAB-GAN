@@ -7,7 +7,7 @@ from model.mygan import wgan
 from model.rcgan import RCGAN
 from model.forgan import ForGAN
 from arguments import parse_args
-from preprocessor import StockDataset
+from lib.data import StockDataset
 from lib.visulization import plot_predicions
 
 if __name__ == '__main__':

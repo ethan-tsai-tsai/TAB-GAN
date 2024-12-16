@@ -66,7 +66,9 @@ class RCGAN:
                 # train generator
                 self.g_optimizer.zero_grad()
                 
-                fake_output = self.model_d(fake_sequence, condition)
+                noise = torch.randn(batch_size, self.noise_dim).to(self.device)
+                fake_sequence = self.model_g(condition, noise)
+                fake_output = self.model_d(fake_sequence.detach(), condition)
                 g_loss = self.criterion(fake_output, real_labels)
                 
                 g_loss.backward()

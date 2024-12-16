@@ -1,22 +1,31 @@
 import numpy as np
 from scipy.special import rel_entr
 
-def calc_kld(generated_data, ground_truth, bins=100, epsilon=1e-10):
-    y_true = np.array(ground_truth)
-    y_pred = np.array(generated_data)
-    min_val = min(np.min(y_true), np.min(y_pred))
-    max_val = max(np.max(y_true), np.max(y_pred))
-
-    hist_true, edges = np.histogram(y_true, bins=bins, range=(min_val, max_val))
-    hist_pred, _ = np.histogram(y_pred, bins=edges)
-
-    hist_true = hist_true + epsilon
-    hist_pred = hist_pred + epsilon
-
-    hist_true = hist_true / np.sum(hist_true)
-    hist_pred = hist_pred / np.sum(hist_pred)
-
-    kld = np.sum(rel_entr(hist_true, hist_pred))
+def calc_kld(generated_data, ground_truth, bins=50, epsilon=1e-5):
+    # 計算範圍
+    ground_truth = np.array(ground_truth)
+    generated_data = np.array(generated_data)
+    
+    all_data = np.concatenate([ground_truth, generated_data])
+    range_min = np.percentile(all_data, 1)
+    range_max = np.percentile(all_data, 99)
+    
+    # 計算直方圖
+    pd_gt, _ = np.histogram(ground_truth, bins=bins, density=True, range=(range_min, range_max))
+    pd_gen, _ = np.histogram(generated_data, bins=bins, density=True, range=(range_min, range_max))
+    
+    # 添加平滑值避免除零問題
+    pd_gt = pd_gt + epsilon
+    pd_gen = pd_gen + epsilon
+    
+    # 重新正規化確保概率和為1
+    pd_gt = pd_gt / np.sum(pd_gt)
+    pd_gen = pd_gen / np.sum(pd_gen)
+    
+    # 計算 KLD
+    kld = 0
+    for x1, x2 in zip(pd_gt, pd_gen):
+        kld += x1 * np.log(x1 / x2)
     
     return kld
 

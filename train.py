@@ -8,7 +8,7 @@ from model.mygan import wgan
 from model.rcgan import RCGAN
 from model.forgan import ForGAN
 from arguments import parse_args
-from preprocessor import StockDataset
+from lib.data import StockDataset
 
 if __name__ == '__main__':
     # record training time

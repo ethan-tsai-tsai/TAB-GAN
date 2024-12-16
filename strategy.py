@@ -9,7 +9,7 @@ from train import wgan
 from arguments import parse_args
 from lib.strategy import TradingStrategy
 from lib.calc import TechnicalIndicators
-from preprocessor import StockDataset, DataProcessor
+from lib.data import StockDataset, DataProcessor
 from lib.visulization import plot_predicions, visualize_band
 
 class TradingAnalysis:
