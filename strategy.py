@@ -5,12 +5,12 @@ import numpy as np
 import pandas as pd
 from typing import Tuple
 
-from train import wgan
+from model.tabgan import TABGAN
 from arguments import parse_args
 from lib.strategy import TradingStrategy
 from lib.calc import TechnicalIndicators
 from lib.data import StockDataset, DataProcessor
-from lib.visulization import plot_predicions, visualize_band
+from lib.visulization import plot_predictions, visualize_band
 
 class TradingAnalysis:
     def __init__(self, args, trial):
@@ -40,7 +40,7 @@ class TradingAnalysis:
         
         return X, y, test_datasets
     
-    def calculate_bounds(self, y_preds: np.ndarray, plot_util: plot_predicions) -> Tuple[list, list]:
+    def calculate_bounds(self, y_preds: np.ndarray, plot_util: plot_predictions) -> Tuple[list, list]:
         """計算預測的上下界"""
         pred_upper, pred_lower = [], []
         for pred in y_preds:
@@ -76,11 +76,11 @@ class TradingAnalysis:
         
         # 設置模型和預測
         time_interval = test_datasets.time_intervals[self.args.window_size:]
-        wgan_model = wgan(test_datasets, self.args)
+        wgan_model = TABGAN(test_datasets, self.args)
         wgan_model.model_g.load_state_dict(checkpoint['model_g'])
         
         # 預測
-        plot_util = plot_predicions(
+        plot_util = plot_predictions(
             path=f'./img/{self.FILE_NAME}', 
             args=self.args, 
             time_interval=time_interval

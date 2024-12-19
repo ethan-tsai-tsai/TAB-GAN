@@ -11,53 +11,63 @@ def visualize_band(args):
     if not os.path.exists('./img/trading_signals'): os.makedirs('./img/trading_signals')
     file_path = f'./data/trading_signals_{args.stock}.csv'
     output_path = f'./img/trading_signals/{args.stock}.png'
+    
     # Read data
     df = pd.read_csv(file_path, parse_dates=['ts'])
     
-    # Define color scheme for different bands
+    # Define color scheme for different bands - using colorblind-friendly colors
     color_scheme = {
         'bollinger': {
-            'color': '#2C3E50',
-            'alpha': 0.3,
-            'signal_color': '#34495E',
+            'color': '#4477AA',  # Blue
+            'alpha': 0.2,
+            'signal_color': '#004488',
             'title': 'Bollinger Bands'
         },
         '50': {
-            'color': '#E74C3C',
-            'alpha': 0.3,
-            'signal_color': '#C0392B',
+            'color': '#EE6677',  # Red
+            'alpha': 0.2,
+            'signal_color': '#CC3311',
             'title': '50% Prediction Band'
         },
         '70': {
-            'color': '#2ECC71',
-            'alpha': 0.3,
-            'signal_color': '#27AE60',
+            'color': '#228833',  # Green
+            'alpha': 0.2,
+            'signal_color': '#116622',
             'title': '70% Prediction Band'
         },
         '90': {
-            'color': '#9B59B6',
-            'alpha': 0.3,
-            'signal_color': '#8E44AD',
+            'color': '#CCBB44',  # Yellow
+            'alpha': 0.2,
+            'signal_color': '#999933',
             'title': '90% Prediction Band'
         }
     }
     
-    # Create figure and subplots with adjusted height ratios and spacing
-    fig = plt.figure(figsize=(15, 25))
-    gs = fig.add_gridspec(5, 1, height_ratios=[0.2, 1, 1, 1, 1], hspace=0.3)
+    # Set the font family to serif for academic style
+    plt.rc('font', family='serif')
+    plt.rc('font', size=11)  # Base font size
+    plt.rc('axes', labelsize=12)
+    plt.rc('axes', titlesize=12)
+    plt.rc('xtick', labelsize=10)
+    plt.rc('ytick', labelsize=10)
+    plt.rc('legend', fontsize=10)
     
-    # Create title subplot and trading subplots
+    # Create figure with adjusted size ratio (closer to golden ratio)
+    fig = plt.figure(figsize=(8, 10))  # Reduced size for better fit in papers
+    gs = fig.add_gridspec(5, 1, height_ratios=[0.15, 1, 1, 1, 1], hspace=0.4)
+    
+    # Create title subplot
     title_ax = fig.add_subplot(gs[0])
     title_ax.axis('off')
-    title_ax.text(0.5, 0.5, 'Trading Strategies Comparison', 
-                 ha='center', va='center', fontsize=14, fontweight='bold')
+    title_ax.text(0.5, 0.5, f'Trading Strategies Comparison for {args.stock}', 
+                 ha='center', va='center', fontsize=13, fontweight='bold')
     
     # Create trading subplots
     axes = [fig.add_subplot(gs[i]) for i in range(1, 5)]
     
-    sns.set_style("whitegrid")
+    # Use classic style with white background
+    plt.style.use('classic')
     
-    # Configure each subplot
     band_configs = [
         {
             'type': 'bollinger',
@@ -89,8 +99,8 @@ def visualize_band(args):
         band_type = config['type']
         colors = color_scheme[band_type]
         
-        # Plot price line
-        ax.plot(df['ts'], df['Close'], color='black', linewidth=1.5, 
+        # Plot price line with thinner line
+        ax.plot(df['ts'], df['Close'], color='black', linewidth=1.0, 
                 label='Close Price', zorder=5)
         
         # Plot band
@@ -101,43 +111,50 @@ def visualize_band(args):
                        color=colors['color'],
                        label=colors['title'])
         
-        # Plot buy signals
+        # Plot buy signals with smaller markers
         buy_signals = df[df[config['signals']] == 1]
         if not buy_signals.empty:
             ax.scatter(buy_signals['ts'], 
                       buy_signals['Close'] * 0.99,
                       marker='^', 
-                      s=100,
+                      s=50,  # Reduced marker size
                       color=colors['signal_color'],
                       label='Buy Signal',
                       zorder=6)
         
-        # Plot sell signals
+        # Plot sell signals with smaller markers
         sell_signals = df[df[config['signals']] == -1]
         if not sell_signals.empty:
             ax.scatter(sell_signals['ts'], 
                       sell_signals['Close'] * 1.01,
                       marker='v', 
-                      s=100,
+                      s=50,  # Reduced marker size
                       color=colors['signal_color'],
                       label='Sell Signal',
                       zorder=6)
         
         # Customize subplot
-        ax.set_title(colors['title'], fontsize=12, pad=10)
-        ax.grid(True, alpha=0.3)
+        ax.set_title(f'({chr(97 + axes.index(ax))}) {colors["title"]}', 
+                    fontsize=12, pad=10)  # Added subfigure labels
+        ax.grid(True, alpha=0.2, linestyle='--')
         ax.set_xlabel('Time' if ax == axes[-1] else '')
         ax.set_ylabel('Price')
         
         # Format x-axis
-        ax.tick_params(axis='x', rotation=0)
-        ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+        ax.tick_params(axis='x', rotation=45)
+        ax.xaxis.set_major_locator(plt.MaxNLocator(6))  # Reduced number of ticks
         
-        # Add legend inside the plot
-        ax.legend(loc='lower right', framealpha=0.9)
+        # Add legend with smaller size and better position
+        ax.legend(loc='upper right', framealpha=0.9, 
+                 bbox_to_anchor=(0.99, 0.99), 
+                 ncol=1)
+        
+        # Add thin border around subplot
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.5)
     
-    # Save plot
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    # Save plot with higher DPI for better print quality
+    plt.savefig(output_path, dpi=600, bbox_inches='tight', format='pdf')
     plt.close()
     
 def save_loss_curve(results, args):
@@ -163,7 +180,7 @@ def save_loss_curve(results, args):
     plt.legend()
     plt.savefig(f'./img/{args.model}/{args.stock}_{args.name}/loss.png')
 
-class plot_predicions:
+class plot_predictions:
     def __init__(self, path, args, time_interval):
         self.args = args
         self.path = path

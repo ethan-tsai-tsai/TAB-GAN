@@ -473,20 +473,38 @@ class DCCGARCHSimulator:
     
     def validate_correlation(self, simulated_data: pd.DataFrame) -> None:
         """驗證原始數據和模擬數據的相關性結構"""
+        # 設置全局字體參數
+        plt.rcParams.update({
+            'font.size': 16,          # 基礎字體大小
+            'font.family': 'serif',   # 使用襯線字體
+            'axes.titlesize': 20,     # 標題字體大小
+            'axes.labelsize': 18,     # 軸標籤字體大小
+            'xtick.labelsize': 16,    # x軸刻度字體大小
+            'ytick.labelsize': 16,    # y軸刻度字體大小
+            'figure.dpi': 300         # 圖形DPI
+        })
         
         original_corr = self.data[['Open', 'High', 'Low', 'Close', 'Volume', 'Amount']].corr()
         simulated_corr = simulated_data.corr()
 
-        # 繪製熱圖比較
-        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        # 創建更大的圖表以適應更大的字體
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
         
-        im1 = ax1.imshow(original_corr)
-        ax1.set_title('Original Correlation')
-        plt.colorbar(im1, ax=ax1)
+        # 設置熱圖顏色映射並添加數值標註
+        cmap = plt.cm.RdYlBu_r  # 使用更適合論文的配色方案
         
-        im2 = ax2.imshow(simulated_corr)
-        ax2.set_title('Simulated Correlation')
-        plt.colorbar(im2, ax=ax2)
+        # 繪製原始相關性熱圖
+        im1 = ax1.imshow(original_corr, cmap=cmap, vmin=-1, vmax=1)
+        ax1.set_title('Original Correlation', pad=20)
+        cbar1 = plt.colorbar(im1, ax=ax1)
+        cbar1.ax.tick_params(labelsize=14)  # 調整colorbar刻度字體大小
+        
+        
+        # 繪製模擬相關性熱圖
+        im2 = ax2.imshow(simulated_corr, cmap=cmap, vmin=-1, vmax=1)
+        ax2.set_title('Simulated Correlation', pad=20)
+        cbar2 = plt.colorbar(im2, ax=ax2)
+        cbar2.ax.tick_params(labelsize=14)  # 調整colorbar刻度字體大小
         
         # 設置標籤
         col_list = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount']
@@ -494,12 +512,24 @@ class DCCGARCHSimulator:
         for ax in [ax1, ax2]:
             ax.set_xticks(range(len(col_list)))
             ax.set_yticks(range(len(col_list)))
-            ax.set_xticklabels(col_list, rotation=45)
+            ax.set_xticklabels(col_list, rotation=45, ha='right')  # 改善標籤可讀性
             ax.set_yticklabels(col_list)
+            ax.tick_params(axis='both', which='major', labelsize=16)  # 刻度標籤大小
         
-        plt.tight_layout()
-        plt.savefig(f'./img/simulate/{args.stock}/corr.png')
+        # 調整佈局
+        plt.tight_layout(pad=3.0)  # 增加子圖之間的間距
+        
+        # 保存高質量圖片
+        plt.savefig(
+            f'./img/simulate/{args.stock}/corr.png',
+            dpi=300,  # 高DPI確保列印品質
+            bbox_inches='tight',  # 確保不裁剪
+            format='png',  # 使用PNG格式
+            facecolor='white',  # 確保背景為白色
+            edgecolor='none'  # 無邊框
+        )
         plt.close()
+        
         # 印出相關係數的差異
         diff = original_corr - simulated_corr
         print("\nCorrelation Difference (Original - Simulated):")
@@ -636,51 +666,79 @@ class DCCGARCHSimulator:
 
     def plot_decomposition(self, col: str = None) -> None:
         """視覺化分解結果，包括日內模式"""
+        # 設置全局字體大小，針對論文格式優化
+        plt.rcParams.update({
+            'font.size': 16,          # 基礎字體大小
+            'font.family': 'serif',   # 使用襯線字體，適合學術論文
+            'axes.titlesize': 20,     # 子圖標題字體大小
+            'axes.labelsize': 18,     # 軸標籤字體大小
+            'xtick.labelsize': 16,    # x軸刻度字體大小
+            'ytick.labelsize': 16,    # y軸刻度字體大小
+            'legend.fontsize': 16,    # 圖例字體大小
+            'figure.dpi': 300,        # 圖形DPI
+        })
+        
         if col is not None:
             columns = [col]
         else:
             columns = self.fit_columns
             
         for col in columns:
-            # 創建包含5個子圖的圖表（添加日內模式）
-            _, axes = plt.subplots(5, 1, figsize=(15, 25))
+            # 創建更大的圖表以適應更大的字體
+            fig, axes = plt.subplots(5, 1, figsize=(12, 20))
             
             # 繪製原始數據
-            axes[0].plot(self.data.index, self.data[col], label='Original Data', color='blue')
-            axes[0].set_title(f'{col} - Original Time Series')
-            axes[0].grid(True)
-            axes[0].legend()
+            axes[0].plot(self.data.index, self.data[col], label='Original Data', 
+                        color='blue', linewidth=2.5)
+            axes[0].set_title(f'{col} - Original Time Series', pad=20)
+            axes[0].grid(True, linestyle='--', alpha=0.7)  # 虛線網格，透明度調整
+            axes[0].legend(loc='best', frameon=True, edgecolor='black')  # 添加圖例邊框
+            axes[0].tick_params(axis='both', which='major', labelsize=16)  # 刻度字體大小
             
             # 繪製趨勢
             axes[1].plot(self.data.index, self.decomposition[col]['trend'], 
-                        label='Trend', color='red')
-            axes[1].set_title(f'{col} - Trend Component')
-            axes[1].grid(True)
-            axes[1].legend()
+                        label='Trend', color='red', linewidth=2.5)
+            axes[1].set_title(f'{col} - Trend Component', pad=20)
+            axes[1].grid(True, linestyle='--', alpha=0.7)
+            axes[1].legend(loc='best', frameon=True, edgecolor='black')
+            axes[1].tick_params(axis='both', which='major', labelsize=16)
             
             # 繪製季節性（年度+週度）
             axes[2].plot(self.data.index, self.decomposition[col]['seasonal'], 
-                        label='Seasonal', color='green')
-            axes[2].set_title(f'{col} - Combined Seasonal Component')
-            axes[2].grid(True)
-            axes[2].legend()
+                        label='Seasonal', color='green', linewidth=2.5)
+            axes[2].set_title(f'{col} - Combined Seasonal Component', pad=20)
+            axes[2].grid(True, linestyle='--', alpha=0.7)
+            axes[2].legend(loc='best', frameon=True, edgecolor='black')
+            axes[2].tick_params(axis='both', which='major', labelsize=16)
             
             # 繪製日內模式
             axes[3].plot(self.data.index, self.decomposition[col]['daily'],
-                        label='Daily Pattern', color='orange')
-            axes[3].set_title(f'{col} - Daily Seasonality')
-            axes[3].grid(True)
-            axes[3].legend()
+                        label='Daily Pattern', color='orange', linewidth=2.5)
+            axes[3].set_title(f'{col} - Daily Seasonality', pad=20)
+            axes[3].grid(True, linestyle='--', alpha=0.7)
+            axes[3].legend(loc='best', frameon=True, edgecolor='black')
+            axes[3].tick_params(axis='both', which='major', labelsize=16)
             
             # 繪製殘差
             axes[4].plot(self.data.index, self.decomposition[col]['residuals'], 
-                        label='Residuals', color='purple')
-            axes[4].set_title(f'{col} - Residuals')
-            axes[4].grid(True)
-            axes[4].legend()
+                        label='Residuals', color='purple', linewidth=2.5)
+            axes[4].set_title(f'{col} - Residuals', pad=20)
+            axes[4].grid(True, linestyle='--', alpha=0.7)
+            axes[4].legend(loc='best', frameon=True, edgecolor='black')
+            axes[4].tick_params(axis='both', which='major', labelsize=16)
             
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.img_path, f'decomposition_{col}.png'))
+            # 調整子圖之間的間距
+            plt.tight_layout(pad=4.0)  # 增加子圖之間的間距
+            
+            # 保存高質量圖片
+            plt.savefig(
+                os.path.join(self.img_path, f'decomposition_{col}.png'),
+                dpi=300,  # 高DPI確保列印品質
+                bbox_inches='tight',  # 確保不裁剪
+                format='png',  # 使用PNG格式以保持清晰度
+                facecolor='white',  # 確保背景為白色
+                edgecolor='none'  # 無邊框
+            )
             plt.close()
 
     def plot_seasonal_components(self, col: str = None) -> None:

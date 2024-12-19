@@ -3,12 +3,12 @@ import os
 import torch
 import numpy as np
 # Import file
-from model.mygan import wgan
 from model.rcgan import RCGAN
+from model.tabgan import TABGAN
 from model.forgan import ForGAN
 from arguments import parse_args
 from lib.data import StockDataset
-from lib.visulization import plot_predicions
+from lib.visulization import plot_predictions
 
 if __name__ == '__main__':
     # set arguments
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     time_interval = test_datasets.time_intervals[args.window_size:]
     
-    if args.model == 'mygan': model = wgan(test_datasets, args)
+    if args.model == 'tabgan': model = TABGAN(test_datasets, args)
     elif args.model == 'rcgan': model = RCGAN(test_datasets, args)
     elif args.model == 'forgan': model = ForGAN(test_datasets, args)
     
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     X = torch.tensor(np.array(test_datasets.X), dtype=torch.float32)
     y = np.array(test_datasets.y)
     y[y == -10] = np.nan
-    plot_util = plot_predicions(path=f'./img/{args.model}/{FILE_NAME}', args=args, time_interval=time_interval)
+    plot_util = plot_predictions(path=f'./img/{args.model}/{FILE_NAME}', args=args, time_interval=time_interval)
     print('------------------------------------------------------------------------------------------------')
     print(f'Evaluating model: {args.name}')
     print(f'Stock: {args.stock}')

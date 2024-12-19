@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 # import file
-from model.mygan import wgan
 from model.rcgan import RCGAN
+from model.tabgan import TABGAN
 from model.forgan import ForGAN
 from lib.calc import calc_kld
 from arguments import parse_args
 from simulated import DCCGARCHSimulator
-from lib.visulization import plot_predicions
+from lib.visulization import plot_predictions
 from lib.data import DataProcessor, StockDataset
 
 def reshape_prediction_data(df):
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     processor = DataProcessor(args, trial=int(args.name[-1]))
     test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     time_interval = test_datasets.time_intervals[args.window_size:]
-    if args.model == 'mygan': model = wgan(test_datasets, args)
+    if args.model == 'tabgan': model = TABGAN(test_datasets, args)
     elif args.model == 'forgan': model = ForGAN(test_datasets, args)
     elif args.model == 'rcgan': model = RCGAN(test_datasets, args)
     
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     y = np.array(test_datasets.y)
     y[y == -10] = np.nan
     
-    plot_util = plot_predicions(path=f'./img/simulated_dist/{args.model}/{FILE_NAME}', args=args, time_interval=time_interval)
+    plot_util = plot_predictions(path=f'./img/simulated_dist/{args.model}/{FILE_NAME}', args=args, time_interval=time_interval)
     
     # get predictions
     y_preds, _ = model.predict(X, y)

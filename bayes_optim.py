@@ -1,13 +1,18 @@
-from torch.utils.data import DataLoader
+import os
 import optuna
-import logging
 import pickle
+import logging
+from datetime import datetime
+from torch.utils.data import DataLoader
+
+from model.tabgan import TABGAN
+from model.forgan import ForGAN
+from model.rcgan import RCGAN
 from arguments import parse_args
 from lib.data import StockDataset
-from train import *
 
 optuna.logging.set_verbosity(optuna.logging.DEBUG)
-def mygan_objective(trial):
+def tabgan_objective(trial):
     try:
         # set hyperparameters
         args.mode = 'optim' # optim mode
@@ -31,27 +36,55 @@ def mygan_objective(trial):
         # prepare dataset
         train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
         test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
-        train_size = int(0.95 * len(train_datasets))
-        val_size = len(train_datasets) - train_size
-        train_data, val_data = random_split(train_datasets, [train_size, val_size])
-        train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
-        val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
+        train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
         test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
         
         print(f'Starting trial with params: {trial.params}')
         # model setup
-        wgan_model = wgan(train_datasets, args)
-        _ = wgan_model.train(train_loader, val_loader)
-        _, _, test_kld = wgan_model.validation(test_loader)
-        _, _, val_kld = wgan_model.validation(val_loader)
+        model = TABGAN(train_datasets, args)
+        _ = model.train(train_loader, test_loader)
+        _, _, test_kld = model.validation(test_loader)
         test_score = test_kld
-        val_score = val_kld
-        alpha = 0.7
-        score = alpha * test_score + (1 - alpha) * val_score
+        score = test_score
         return score
     except Exception as e:
         logging.error(f"Error in trial {trial.number}: {e}")
-        raise optuna.exceptions.TrialPruned()  # Better handling of failed trials
+        raise optuna.exceptions.TrialPruned()
+
+def rcgan_objective(trial):
+    try:
+        # set hyperparameters
+        args.mode = 'optim' # optim mode
+        # data
+        args.noise_dim = trial.suggest_categorical('noise_dim', [32, 64, 128, 256])
+        # model
+        args.hidden_dim_g = trial.suggest_categorical('hidden_dim_g', [32, 64, 128, 256])
+        args.num_layers_g = trial.suggest_int('num_layers_g', 1, 4)
+        args.hidden_dim_d = trial.suggest_categorical('hidden_dim_d', [16, 32, 64, 128, 256])
+        args.num_layers_d = trial.suggest_int('num_layers_d', 1, 4)
+        # train
+        args.epoch  = trial.suggest_int('epoch', 10, 200)
+        args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-2, log=True)
+        args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-2, log=True)
+        args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])
+        
+        # prepare dataset
+        train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
+        test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
+        train_loader = DataLoader(train_datasets, batch_size=args.batch_size, shuffle=False)
+        test_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
+        
+        print(f'Starting trial with params: {trial.params}')
+        # model setup
+        model = RCGAN(train_datasets, args)
+        _ = model.train(train_loader, test_loader)
+        _, _, test_kld = model.validation(test_loader)
+        test_score = test_kld
+        score = test_score
+        return score
+    except Exception as e:
+        logging.error(f"Error in trial {trial.number}: {e}")
+        raise optuna.exceptions.TrialPruned()
         
 def forgan_objective(trial):
     try:
@@ -96,11 +129,12 @@ if __name__ == '__main__':
     if not os.path.exists(model_path): os.makedirs(model_path)
     
     study = optuna.create_study(direction='minimize')
-    if args.model in ['mygan', 'rcgan']:
-        study.optimize(mygan_objective, n_trials=10)
+    if args.model == 'tabgan':
+        study.optimize(tabgan_objective, n_trials=10)
     elif args.model == 'forgan':
         study.optimize(forgan_objective, n_trials=10)
-    
+    elif args.model == 'rcgan':
+        study.optimize(rcgan_objective, n_trials=10)
     print('Best trial:')
     trial = study.best_trial
     print('  Value: {}'.format(trial.value))

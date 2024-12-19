@@ -9,9 +9,9 @@ from torch import nn
 from lib.calc import calc_kld
 from lib.utils import save_model
 from lib.visulization import save_loss_curve
-from model.algos.mygan_models import generator, discriminator
+from model.algos.tabgan import generator, discriminator
 
-class wgan:
+class TABGAN:
     def __init__(self,stock_data, args):
         self.args = args
         self.device = f'cuda:{args.cuda}' if torch.cuda.is_available() else 'cpu'

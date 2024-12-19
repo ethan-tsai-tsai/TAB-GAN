@@ -1,11 +1,10 @@
 import os
 import pickle
-import numpy as np
 from datetime import datetime
 from torch.utils.data import DataLoader, random_split
 # Import file
-from model.mygan import wgan
 from model.rcgan import RCGAN
+from model.tabgan import TABGAN
 from model.forgan import ForGAN
 from arguments import parse_args
 from lib.data import StockDataset
@@ -43,8 +42,8 @@ if __name__ == '__main__':
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
     val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
     
-    if args.model == 'mygan':
-        model = wgan(train_datasets, args)
+    if args.model == 'tabgan':
+        model = TABGAN(train_datasets, args)
     elif args.model == 'rcgan':
         model = RCGAN(train_datasets, args)
     elif args.model == 'forgan':
@@ -62,7 +61,7 @@ if __name__ == '__main__':
     for k, v in vars(args).items():
         if k in filter_val: print("{}:\t{}".format(k, v))
     print('----------------------------------------------------------------')
-    if args.model in ['mygan', 'rcgan']:
+    if args.model in ['tabgan', 'rcgan']:
         results = model.train(train_loader, val_loader)
     elif args.model == 'forgan':
         model.train(train_datasets, val_datasets)

@@ -122,7 +122,7 @@ class RCGAN:
                 total_loss_g += g_loss.cpu().detach().numpy()
                 
                 # update best model (use kld)
-                kld = calc_kld(fake_output.cpu().detach().numpy(), real_sequence.cpu().detach().numpy())
+                kld = calc_kld(fake_sequence.cpu().detach().numpy(), real_sequence.cpu().detach().numpy())
                 
         return total_loss_d, total_loss_g, kld
     
