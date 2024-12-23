@@ -19,7 +19,7 @@ class TABGAN:
         self.model_g = generator(stock_data.num_features - 1, self.device, self.args).to(self.device)
 
         self.model_path = f'./model_saved/{args.model}/{args.stock}_{args.name}'
-        img_path = f'./img/model_saved/{args.model}/{args.stock}_{args.name}'
+        img_path = f'./img/{args.model}/{args.stock}_{args.name}'
         if not os.path.exists(img_path): os.makedirs(img_path)
     def train(self, train_loader, val_loader):
         # training set
