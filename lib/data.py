@@ -210,3 +210,20 @@ class StockDataset(Dataset):
 if __name__ == '__main__':
     args = parse_args()
     data_processor = DataProcessor(args, trial=1)
+    
+class SubsetStockDataset(Dataset):
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = indices
+        
+        if isinstance(dataset.X, list): self.X = np.array(dataset.X)[indices]
+        else: self.X = dataset.X[indices]
+        
+        if isinstance(dataset.y, list): self.y = np.array(dataset.y)[indices]
+        else: self.y = dataset.y[indices]
+        
+    def __getitem__(self, idx):
+        return self.dataset[self.indices[idx]]
+    
+    def __len__(self):
+        return len(self.indices)

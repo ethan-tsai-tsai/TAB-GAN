@@ -7,7 +7,6 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         
-        # 改進的位置編碼，使用 sin/cos 而不是學習
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
         pe = torch.zeros(1, max_len, d_model)
@@ -41,11 +40,9 @@ class generator(nn.Module):
         self.hidden_layer_size = [args.hidden_dim_g] * args.num_layers_g
         output_size = args.target_length//args.time_step
         noise_size = args.noise_dim
-        # 加入梯度裁剪和縮放
         self.gradient_clip = args.gradient_clip if hasattr(args, 'gradient_clip') else 1.0
         self.dropout = nn.Dropout(p=0.1)
         
-        # 使用 GRU 替代 LSTM，減少參數量並避免梯度消失
         self.gru_list = nn.ModuleList(
             [nn.GRU(condition_size if i == 0 else self.hidden_layer_size[i-1] * 2, 
                     self.hidden_layer_size[i], 
@@ -104,7 +101,6 @@ class generator(nn.Module):
                     nn.init.zeros_(param)
     
     def forward(self, cond, noise):
-        # 梯度裁剪
         torch.nn.utils.clip_grad_norm_(self.parameters(), self.gradient_clip)
         
         for i in range(len(self.gru_list)):
@@ -133,7 +129,6 @@ class discriminator(nn.Module):
         super(discriminator, self).__init__()
         self.device = device
         
-        # 擴展嵌入維度
         self.cond_embedding = nn.Sequential(
             nn.Linear(cond_dim, args.hidden_dim_d),
             nn.LayerNorm(args.hidden_dim_d),
@@ -142,7 +137,7 @@ class discriminator(nn.Module):
         )
         
         self.x_embedding = nn.Sequential(
-            nn.Linear(1, args.hidden_dim_d),
+            nn.Linear(x_dim, args.hidden_dim_d),
             nn.LayerNorm(args.hidden_dim_d),
             nn.GELU(),
             ResidualBlock(args.hidden_dim_d)
@@ -150,7 +145,6 @@ class discriminator(nn.Module):
         
         self.position_encoding = PositionalEncoding(args.hidden_dim_d, dropout=0.1)
         
-        # 使用更深的 Transformer 架構
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=args.hidden_dim_d,
             nhead=args.num_head_d,
@@ -165,7 +159,6 @@ class discriminator(nn.Module):
             norm=nn.LayerNorm(args.hidden_dim_d)
         )
         
-        # 加入自注意力機制的輸出層
         self.attention = nn.MultiheadAttention(
             embed_dim=args.hidden_dim_d,
             num_heads=args.num_head_d,
@@ -200,17 +193,13 @@ class discriminator(nn.Module):
         cond_embedded = self.cond_embedding(cond)
         x_embedded = self.x_embedding(x.unsqueeze(-1))
         
-        # 連接條件和輸入
         combined = torch.cat((cond_embedded, x_embedded), dim=1)
         combined = self.position_encoding(combined)
         
-        # Transformer 編碼
         encoded = combined.permute(1, 0, 2)
         encoded = self.encoder(encoded)
         
-        # 自注意力機制
         attn_output, _ = self.attention(encoded[-1:], encoded, encoded)
         
-        # 最終分類
         out = self.fc(attn_output.squeeze(0))
         return out

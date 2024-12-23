@@ -9,7 +9,7 @@ from torch import nn
 from lib.calc import calc_kld
 from lib.utils import save_model
 from lib.visulization import save_loss_curve
-from model.algos.tabgan import generator, discriminator
+from model.algos.tabgan_model import generator, discriminator
 
 class TABGAN:
     def __init__(self,stock_data, args):

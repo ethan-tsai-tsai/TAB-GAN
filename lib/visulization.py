@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 def visualize_band(args):
     if not os.path.exists('./img/trading_signals'): os.makedirs('./img/trading_signals')
-    file_path = f'./data/trading_signals_{args.stock}.csv'
+    file_path = f'./res/{args.model}/trading_signals/{args.stock}.csv'
     output_path = f'./img/trading_signals/{args.stock}.png'
     
     # Read data
@@ -42,8 +42,7 @@ def visualize_band(args):
             'title': '90% Prediction Band'
         }
     }
-    
-    # Set the font family to serif for academic style
+
     plt.rc('font', family='serif')
     plt.rc('font', size=11)  # Base font size
     plt.rc('axes', labelsize=12)
@@ -52,21 +51,16 @@ def visualize_band(args):
     plt.rc('ytick', labelsize=10)
     plt.rc('legend', fontsize=10)
     
-    # Create figure with adjusted size ratio (closer to golden ratio)
-    fig = plt.figure(figsize=(8, 10))  # Reduced size for better fit in papers
-    gs = fig.add_gridspec(5, 1, height_ratios=[0.15, 1, 1, 1, 1], hspace=0.4)
+    # Create figure with adjusted size ratio
+    fig = plt.figure(figsize=(10, 12))  # Increased width to accommodate legends
     
-    # Create title subplot
-    title_ax = fig.add_subplot(gs[0])
-    title_ax.axis('off')
-    title_ax.text(0.5, 0.5, f'Trading Strategies Comparison for {args.stock}', 
-                 ha='center', va='center', fontsize=13, fontweight='bold')
+    # Create gridspec with space for individual legends
+    gs = fig.add_gridspec(4, 1, height_ratios=[1, 1, 1, 1], hspace=0.5)
     
     # Create trading subplots
-    axes = [fig.add_subplot(gs[i]) for i in range(1, 5)]
-    
-    # Use classic style with white background
-    plt.style.use('classic')
+    axes = []
+    for i in range(4):
+        axes.append(fig.add_subplot(gs[i]))
     
     band_configs = [
         {
@@ -99,62 +93,70 @@ def visualize_band(args):
         band_type = config['type']
         colors = color_scheme[band_type]
         
-        # Plot price line with thinner line
-        ax.plot(df['ts'], df['Close'], color='black', linewidth=1.0, 
-                label='Close Price', zorder=5)
+        # Plot price line
+        line = ax.plot(df['ts'], df['Close'], color='black', linewidth=1.0, 
+                      label='Close Price', zorder=5)[0]
         
         # Plot band
-        ax.fill_between(df['ts'], 
-                       df[config['upper']], 
-                       df[config['lower']],
-                       alpha=colors['alpha'],
-                       color=colors['color'],
-                       label=colors['title'])
+        band = ax.fill_between(df['ts'], 
+                             df[config['upper']], 
+                             df[config['lower']],
+                             alpha=colors['alpha'],
+                             color=colors['color'],
+                             label=colors['title'])
         
-        # Plot buy signals with smaller markers
+        # Plot buy signals with increased offset
         buy_signals = df[df[config['signals']] == 1]
         if not buy_signals.empty:
-            ax.scatter(buy_signals['ts'], 
-                      buy_signals['Close'] * 0.99,
-                      marker='^', 
-                      s=50,  # Reduced marker size
-                      color=colors['signal_color'],
-                      label='Buy Signal',
-                      zorder=6)
+            buy_scatter = ax.scatter(buy_signals['ts'], 
+                                   buy_signals['Close'] * 0.97,  # Increased offset
+                                   marker='^', 
+                                   s=60,
+                                   color=colors['signal_color'],
+                                   label='Buy Signal',
+                                   zorder=6)
         
-        # Plot sell signals with smaller markers
+        # Plot sell signals with increased offset
         sell_signals = df[df[config['signals']] == -1]
         if not sell_signals.empty:
-            ax.scatter(sell_signals['ts'], 
-                      sell_signals['Close'] * 1.01,
-                      marker='v', 
-                      s=50,  # Reduced marker size
-                      color=colors['signal_color'],
-                      label='Sell Signal',
-                      zorder=6)
+            sell_scatter = ax.scatter(sell_signals['ts'], 
+                                    sell_signals['Close'] * 1.03,  # Increased offset
+                                    marker='v', 
+                                    s=60,
+                                    color=colors['signal_color'],
+                                    label='Sell Signal',
+                                    zorder=6)
         
         # Customize subplot
         ax.set_title(f'({chr(97 + axes.index(ax))}) {colors["title"]}', 
-                    fontsize=12, pad=10)  # Added subfigure labels
+                    fontsize=12, pad=15)
         ax.grid(True, alpha=0.2, linestyle='--')
         ax.set_xlabel('Time' if ax == axes[-1] else '')
         ax.set_ylabel('Price')
         
         # Format x-axis
-        ax.tick_params(axis='x', rotation=45)
-        ax.xaxis.set_major_locator(plt.MaxNLocator(6))  # Reduced number of ticks
+        ax.tick_params(axis='x')
+        ax.xaxis.set_major_locator(plt.MaxNLocator(6))
         
-        # Add legend with smaller size and better position
-        ax.legend(loc='upper right', framealpha=0.9, 
-                 bbox_to_anchor=(0.99, 0.99), 
-                 ncol=1)
-        
-        # Add thin border around subplot
+        # Add thin border
         for spine in ax.spines.values():
             spine.set_linewidth(0.5)
+            
+        # Add legend for each subplot
+        handles = [line, band, buy_scatter, sell_scatter]
+        labels = ['Close Price', colors['title'], 'Buy Signal', 'Sell Signal']
+        ax.legend(handles, labels, 
+                 loc='center left',  # Position legend to the right of the plot
+                 bbox_to_anchor=(1.02, 0.5),  # Fine-tune legend position
+                 frameon=True,
+                 framealpha=0.9,
+                 edgecolor='black',
+                 fancybox=False)
     
-    # Save plot with higher DPI for better print quality
-    plt.savefig(output_path, dpi=600, bbox_inches='tight', format='pdf')
+    # Adjust layout to prevent legend overlap
+    # plt.tight_layout()
+    
+    plt.savefig(output_path, dpi=600, bbox_inches='tight', pad_inches=0.2)
     plt.close()
     
 def save_loss_curve(results, args):

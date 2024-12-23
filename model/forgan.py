@@ -99,14 +99,13 @@ class ForGAN:
             # Validation
             noise_batch = torch.tensor(rs.normal(0, 1, (x_val.size(0), self.args.noise_dim)), device=self.device,
                                        dtype=torch.float32)
-            preds = self.model_g(noise_batch, x_val).detach().cpu().numpy().flatten()
-
+            preds = self.model_g(noise_batch, x_val).detach().cpu().numpy()
             kld = calc_kld(preds, y_val)
 
             if kld <= best_kld and kld != np.inf:
                 best_kld = kld
                 print("step : {} , KLD : {}, RMSE : {}".format(step, best_kld,
-                                                               np.sqrt(np.square(preds - y_val.flatten()).mean())))
+                                                               np.sqrt(np.square(preds.flatten() - y_val.flatten()).mean())))
                 save_model(self.model_d, self.model_g, self.args, f'./{self.model_path}/final.pth')
             
             if step % 100 == 0:

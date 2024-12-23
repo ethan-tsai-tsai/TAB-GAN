@@ -7,7 +7,7 @@ from model.rcgan import RCGAN
 from model.tabgan import TABGAN
 from model.forgan import ForGAN
 from arguments import parse_args
-from lib.data import StockDataset
+from lib.data import StockDataset, SubsetStockDataset
 
 if __name__ == '__main__':
     # record training time
@@ -34,7 +34,6 @@ if __name__ == '__main__':
     if not os.path.exists(f'./img/{args.model}/{args.stock}_{args.name}'): os.makedirs(f'./img/{args.model}/{args.stock}_{args.name}')
     # prepare dataset
     train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')
-    val_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
     
     train_size = int(0.95 * len(train_datasets))
     val_size = len(train_datasets) - train_size
@@ -64,7 +63,10 @@ if __name__ == '__main__':
     if args.model in ['tabgan', 'rcgan']:
         results = model.train(train_loader, val_loader)
     elif args.model == 'forgan':
-        model.train(train_datasets, val_datasets)
+        train_indices, val_indices = random_split(range(len(train_datasets)), [train_size, val_size])
+        train_data = SubsetStockDataset(train_datasets, train_indices.indices)
+        val_data = SubsetStockDataset(train_datasets, val_indices.indices)
+        model.train(train_data, val_data)
     
     end_time = datetime.now()
     training_time = (end_time - start_time).seconds

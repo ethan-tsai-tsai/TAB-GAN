@@ -190,7 +190,7 @@ if __name__ == '__main__':
     print(results.to_string(index=False))
     
     # 儲存結果
-    results.to_csv(f'./res/trading_results/{args.stock}.csv', index=False)
-    trading_data.to_csv(f'./res/trading_signals/{args.stock}.csv', index=False)
+    results.to_csv(f'./res/{args.model}/trading_results/{args.stock}.csv', index=False)
+    trading_data.to_csv(f'./res/{args.model}/trading_signals/{args.stock}.csv', index=False)
     
     visualize_band(args)
