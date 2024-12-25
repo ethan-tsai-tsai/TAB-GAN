@@ -6,8 +6,8 @@ import numpy as np
 from torch import nn
 
 # import files
-from lib.calc import calc_kld
 from lib.utils import save_model
+from lib.calc import calc_kld, KLDLoss
 from lib.visulization import save_loss_curve
 from model.algos.tabgan_model import generator, discriminator
 
@@ -18,6 +18,7 @@ class TABGAN:
         self.model_d = discriminator(stock_data.num_features - 1, 1, self.device, self.args).to(self.device)
         self.model_g = generator(stock_data.num_features - 1, self.device, self.args).to(self.device)
 
+        self.best_kld = np.inf
         self.model_path = f'./model_saved/{args.model}/{args.stock}_{args.name}'
         img_path = f'./img/{args.model}/{args.stock}_{args.name}'
         if not os.path.exists(img_path): os.makedirs(img_path)
@@ -25,7 +26,7 @@ class TABGAN:
         # training set
         optimizer_d = torch.optim.AdamW(self.model_d.parameters(), lr=self.args.lr_d, betas = (0.0, 0.9), weight_decay = 1e-3)
         optimizer_g = torch.optim.AdamW(self.model_g.parameters(), lr=self.args.lr_g, betas = (0.0, 0.9), weight_decay = 1e-3)
-        loss_fn = nn.L1Loss()
+        loss_fn = KLDLoss()
         results = {'loss_d': [], 'loss_g': [], 'test_loss_d': [], 'test_loss_g': [], 'test_kld': []}
         
         for epoch in range(self.args.epoch):
@@ -53,12 +54,22 @@ class TABGAN:
                 loss_g.backward()
                 optimizer_g.step()
                 
-                # train generator (minimize mae loss)
+                for _ in range(self.args.d_iter):
+                    noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
+                    fake_data = self.model_g(X, noise)
+                    assert not torch.isnan(fake_data).any(), 'Generated data has nan values. Stop training.'
+                    gradient_penalty = self._compute_gradient_penalty(X, y, fake_data)
+                    loss_d = self._discriminator_loss(X, y, fake_data, gradient_penalty)
+                    optimizer_d.zero_grad()
+                    loss_d.backward()
+                    optimizer_d.step()
+                
+                # train generator (minimize kld loss)
                 noise = torch.randn(X.shape[0], self.args.noise_dim).to(self.device)
                 fake_data = self.model_g(X, noise)
-                mae_loss = loss_fn(y, fake_data)
+                kld_loss = loss_fn(fake_data, y)
                 optimizer_g.zero_grad()
-                mae_loss.backward()
+                kld_loss.backward()
                 optimizer_g.step()
             total_loss_d += loss_d.cpu().detach().numpy()
             total_loss_g += loss_g.cpu().detach().numpy()
@@ -74,7 +85,7 @@ class TABGAN:
                 print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
             
         # save model
-        save_model(self.model_d, self.model_g, self.args, f'{self.model_path}/final.pth')
+        # save_model(self.model_d, self.model_g, self.args, f'{self.model_path}/final.pth')
         if self.args.mode == 'train': save_loss_curve(results, self.args)
         return results
     
@@ -102,7 +113,10 @@ class TABGAN:
                 
                 # update best model (use kld)
                 kld = calc_kld(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
-                
+                if kld <= self.best_kld and kld != np.inf:
+                    self.best_kld = kld
+                    save_model(self.model_d, self.model_g, self.args, f'./{self.model_path}/final.pth')
+                    if self.args.mode == 'train': print(f'Update best kld with {kld}')
         return total_loss_d, total_loss_g, kld
         
     def predict(self, X, y=None):

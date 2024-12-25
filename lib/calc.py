@@ -1,5 +1,7 @@
+import torch
 import numpy as np
-from scipy.special import rel_entr
+from torch import nn
+import torch.nn.functional as F
 
 def calc_kld(generated_data, ground_truth, bins=50, epsilon=1e-5):
     # 計算範圍
@@ -28,6 +30,34 @@ def calc_kld(generated_data, ground_truth, bins=50, epsilon=1e-5):
         kld += x1 * np.log(x1 / x2)
     
     return kld
+
+class KLDLoss(nn.Module):
+    def __init__(self, reduction='mean'):
+        """
+        初始化 KL Divergence Loss
+        
+        Args:
+            reduction (str): 'mean', 'sum' 或 'none'，決定如何減少損失值
+        """
+        super(KLDLoss, self).__init__()
+        self.reduction = reduction
+        
+    def forward(self, y_pred, y_true):
+        y_pred = F.softmax(y_pred, dim=1)
+        y_true = F.softmax(y_true, dim=1)
+        
+        eps = 1e-7
+        y_pred = torch.clamp(y_pred, eps, 1.0)
+        y_true = torch.clamp(y_true, eps, 1.0)
+        
+        kld = torch.sum(y_true * torch.log(y_true / y_pred), dim=1)
+        
+        if self.reduction == 'mean':
+            return torch.mean(kld)
+        elif self.reduction == 'sum':
+            return torch.sum(kld)
+        else:  # 'none'
+            return kld
 
 class TechnicalIndicators:
     @staticmethod

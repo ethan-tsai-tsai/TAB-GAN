@@ -26,7 +26,7 @@ def tabgan_objective(trial):
         args.num_layers_d = trial.suggest_int('num_layers_d', 1, 4)
         args.num_head_d = trial.suggest_categorical('num_head_d', [4, 8, 16])
         # train
-        args.epoch  = trial.suggest_int('epoch', 10, 200)
+        args.epoch  = trial.suggest_int('epoch', 100, 300)
         args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-2, log=True)
         args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-2, log=True)
         args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])
@@ -102,7 +102,7 @@ def forgan_objective(trial):
         args.noise_dim = trial.suggest_categorical('noise_dim', [1, 2, 4, 8, 16, 32])
         args.d_iter = trial.suggest_int('d_iter', 1, 7)
 
-        args.epoch = trial.suggest_int('epoch', 1000, 1000)
+        args.epoch = trial.suggest_int('epoch', 500, 500)
         args.batch_size = trial.suggest_int('batch_size', 1000, 1000)
         args.lr_g = trial.suggest_float('lr_g', 1e-3, 1e-3, log=True)
         args.lr_d = trial.suggest_float('lr_d', 1e-3, 1e-3, log=True)
