@@ -137,7 +137,8 @@ class DCCGARCHSimulator:
                 yearly_seasonality=True,
                 weekly_seasonality=True,
                 daily_seasonality=True,
-                changepoint_prior_scale=0.05
+                changepoint_prior_scale=0.5,
+                seasonality_prior_scale=10.0
             )
             model.fit(df)
             
@@ -151,6 +152,46 @@ class DCCGARCHSimulator:
                 'daily': forecast['daily'].values,
                 'residuals': self.data[col].values - forecast['yhat'].values
             }
+    
+    def combine_components(self, trend, seasonal, residuals, col_name):
+        if col_name in ['Volume']:
+            # 使用對數轉換後的數據計算標準差和範圍
+            col_std = self.data[col_name].std()
+            col_min = self.data[col_name].min()
+            col_max = self.data[col_name].max()
+            
+            # 避免除以零或極小值
+            residuals_std = np.std(residuals) if isinstance(residuals, np.ndarray) else abs(residuals)
+            if residuals_std < self.epsilon:
+                residuals_std = self.epsilon
+            
+            # 使用較小的縮放範圍，因為這是在對數尺度上
+            scale_factor = np.clip(col_std / residuals_std, -10, 10)
+            
+            # 計算並限制結果範圍
+            scaled_residuals = residuals * scale_factor
+            result = trend + seasonal + scaled_residuals
+            
+            # 在對數尺度上的合理範圍內進行限制
+            return np.clip(result, col_min, col_max)
+        
+        else:  # 對於價格類欄位保持原有的處理方式
+            price_std = self.data[col_name].std()
+            
+            # 避免除以零或極小值
+            residuals_std = np.std(residuals) if isinstance(residuals, np.ndarray) else abs(residuals)
+            if residuals_std < self.epsilon:
+                residuals_std = self.epsilon
+            
+            # 限制縮放係數的範圍
+            scale_factor = np.clip(price_std / residuals_std, -10, 10)
+            
+            # 計算並限制結果範圍
+            scaled_residuals = residuals * scale_factor
+            result = trend + seasonal + scaled_residuals
+            
+            # 確保結果在合理範圍內
+            return np.clip(result, result * 0.9, result * 1.1)
     
     def fit_dcc_garch(self) -> None:
         """使用 R 的 rmgarch 套件擬合 DCC-GARCH 模型"""
@@ -185,7 +226,7 @@ class DCCGARCHSimulator:
                     replicate(n_series,
                         ugarchspec(
                             mean.model = list(armaOrder = c(0,0), include.mean = FALSE),
-                            variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+                            variance.model = list(model = "sGARCH", garchOrder = c(1,1), alpha1 = 0.1, beta1 = 0.85),
                             distribution.model = "sstd",
                             fixed.pars = list()
                         )
@@ -293,7 +334,7 @@ class DCCGARCHSimulator:
             seasonal = (forecast['yearly'] + forecast['weekly'] + forecast['daily']).values
             
             # 將趨勢、季節性和模擬殘差相加
-            simulated_data[col] = trend + seasonal + simulated_residuals[:, i]
+            simulated_data[col] = self.combine_components(trend, seasonal, simulated_residuals[:, i], col)
         
         # 進行異常值處理
         simulated_data = self.clean_outliers(simulated_data, window=5)
@@ -338,9 +379,6 @@ class DCCGARCHSimulator:
             ]
             time_points.extend(daily_points)
         
-        simulated_closes = []
-        dates = []
-        
         file_path = f'./model_saved/simulator'
         model_path = f'{file_path}/{self.args.stock}_simulator.pth'
         if not os.path.exists(model_path):
@@ -361,28 +399,44 @@ class DCCGARCHSimulator:
             self.transform_params = loaded_simulator.transform_params
             simulator = self
         
-        # 預測每個時間點
-        for time_point in time_points:
+        results = []
+        residuals = simulator.simulate_dcc_garch(len(time_points) * n_simulations)
+        residuals = residuals.reshape(len(time_points), n_simulations, -1)
+
+        series_data = []
+        for t, time_point in enumerate(time_points):
             df_for_prophet = pd.DataFrame({'ds': [time_point]})
             forecast = simulator.prophet_models['Close'].predict(df_for_prophet)
             trend = forecast['trend'].values[0]
             seasonal = (forecast['yearly'] + forecast['weekly'] + forecast['daily']).values[0]
             
-            # 對每個時間點進行n_simulations次模擬
-            for _ in range(n_simulations):
-                residuals = simulator.simulate_dcc_garch(1)[0]
-                close_price = trend + seasonal + residuals[3]
-                simulated_closes.append(close_price)
-                dates.append(time_point)
+            close_price = self.combine_components(trend, seasonal, residuals[t, :, 3], 'Close')
+            series_data.append({
+                'date': time_point,
+                'Close': close_price,
+                'trend': trend,
+                'seasonality': seasonal,
+                'residual': residuals[t, :, 3],
+            })
+        results.extend(series_data)
         
         # 轉換為DataFrame並處理格式
-        results = pd.DataFrame({
-            'date': dates,
-            'Close': simulated_closes
-        })
-        results['Close'] = results['Close'].apply(self.round_price)
-        
-        return results
+        results = pd.DataFrame(results)
+        long_format_data = []
+        for idx, row in results.iterrows():
+            for sim in range(n_simulations):
+                long_format_data.append({
+                    'date': row['date'],
+                    'Close': row['Close'][sim],
+                    'trend': row['trend'],
+                    'seasonality': row['seasonality'],
+                    'residual': row['residual'][sim],
+                    'simulation_id': sim + 1,
+                })
+
+        df_long = pd.DataFrame(long_format_data)
+        df_long.to_csv('./test.csv', index=False)
+        return df_long
     
     def round_price(self, price):
         """根據台灣股市規則對股價進行四捨五入"""
@@ -444,11 +498,17 @@ class DCCGARCHSimulator:
         """根據成交量和價格生成成交金額"""
         result = simulated_data.copy()
         
-        # 1. 計算估計的VWAP
-        estimated_vwap = (result['Open'] + result['High'] + 
-                         result['Low'] + result['Close']) / 4
+        # 1. 先將 Volume 轉換為數值類型並確保精確度
+        result['Volume'] = pd.to_numeric(result['Volume'], errors='coerce').fillna(0)
         
-        # 2. 生成受限的隨機價格偏差
+        # 2. 創建 Volume 為 0 的遮罩
+        zero_volume_mask = np.isclose(result['Volume'], 0, atol=1e-10)
+        
+        # 3. 計算估計的 VWAP
+        estimated_vwap = (result['Open'] + result['High'] + 
+                        result['Low'] + result['Close']) / 4
+        
+        # 4. 生成受限的隨機價格偏差
         n_samples = len(result)
         price_deviations = np.random.normal(
             self.price_stats['mean_deviation'],
@@ -463,11 +523,21 @@ class DCCGARCHSimulator:
             self.price_stats['percentile_95']
         )
         
-        # 3. 計算模擬的平均交易價格
+        # 5. 計算模擬的平均交易價格
         simulated_avg_price = estimated_vwap * (1 + price_deviations)
         
-        # 4. 生成成交金額
+        # 6. 生成成交金額
         result['Amount'] = result['Volume'] * simulated_avg_price
+        
+        # 7. 確保 Volume 為 0 的資料點 Amount 為 0
+        result.loc[zero_volume_mask, 'Amount'] = 0
+        
+        # 8. 清理可能的無效值和極小值
+        result['Amount'] = result['Amount'].fillna(0)
+        result.loc[result['Amount'] < 1e-10, 'Amount'] = 0  # 處理極小值
+        
+        # 9. 確保最終結果是整數
+        result['Amount'] = result['Amount'].round().astype('Int64')
         
         return result
     
@@ -624,12 +694,6 @@ class DCCGARCHSimulator:
             # 計算移動中位數
             rolling_median = cleaned_data[col].rolling(window=window, center=True).median()
             rolling_std = cleaned_data[col].rolling(window=window, center=True).std()
-            
-            # 識別異常值 (使用對數尺度計算)
-            # log_values = np.log(cleaned_data[col] + self.epsilon)
-            # log_median = np.log(rolling_median + self.epsilon)
-            # log_std = np.log(rolling_std + self.epsilon)
-            
             z_scores = np.abs((cleaned_data[col] - rolling_median) / rolling_std)
             outliers = z_scores > 3.0  # 超過3個標準差視為異常
             

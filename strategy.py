@@ -190,7 +190,12 @@ if __name__ == '__main__':
     print(results.to_string(index=False))
     
     # 儲存結果
-    results.to_csv(f'./res/{args.model}/trading_results/{args.stock}.csv', index=False)
-    trading_data.to_csv(f'./res/{args.model}/trading_signals/{args.stock}.csv', index=False)
+    res_path = f'./res/{args.model}/trading_results'
+    trading_path = f'./res/{args.model}/trading_signals'
+    if not os.path.exists('./res'): os.makedirs('./res')
+    if not os.path.exists(res_path): os.makedirs(res_path)
+    if not os.path.exists(trading_path): os.makedirs(trading_path)
+    results.to_csv(f'{res_path}/{args.stock}.csv', index=False)
+    trading_data.to_csv(f'{trading_path}/{args.stock}.csv', index=False)
     
     visualize_band(args)
