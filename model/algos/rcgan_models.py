@@ -18,7 +18,7 @@ class Generator(nn.Module):
     def forward(self, condition, noise):
         batch_size, seq_len, _ = condition.size()
         noise = torch.randn(batch_size, seq_len, self.noise_dim, device=noise.device)
-        combined_input = torch.cat((noise, condition), dim=-1)
+        combined_input = torch.cat((condition, noise), dim=-1)
         lstm_out, _ = self.lstm(combined_input)
         output = self.output_layer(lstm_out)
         output = output[:, -1, :]
@@ -38,7 +38,7 @@ class Discriminator(nn.Module):
 
     def forward(self, sequence, condition):
         sequence = self.seq_embedding(sequence.unsqueeze(-1))
-        combined_input = torch.cat((sequence, condition), dim=1)
+        combined_input = torch.cat((condition, sequence), dim=1)
         lstm_out, _ = self.lstm(combined_input)
         lstm_out = lstm_out[:, -1, :]
         outputs = self.output_layer(lstm_out)

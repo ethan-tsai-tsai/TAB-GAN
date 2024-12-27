@@ -110,8 +110,8 @@ class generator(nn.Module):
         
         cond = self.position_encoding(cond)
         
-        # for block in self.residual_blocks:
-        #     cond = block(cond)
+        for block in self.residual_blocks:
+            cond = block(cond)
             
         cond = cond.permute(1, 0, 2)
         cond_encoded = self.transformer_encoder(cond)

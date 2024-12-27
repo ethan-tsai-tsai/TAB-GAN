@@ -184,14 +184,15 @@ class DCCGARCHSimulator:
                 residuals_std = self.epsilon
             
             # 限制縮放係數的範圍
-            scale_factor = np.clip(price_std / residuals_std, -10, 10)
+            scale_factor = np.clip(price_std / residuals_std, -50, 50)
             
             # 計算並限制結果範圍
             scaled_residuals = residuals * scale_factor
             result = trend + seasonal + scaled_residuals
             
             # 確保結果在合理範圍內
-            return np.clip(result, result * 0.9, result * 1.1)
+            base_price = trend + seasonal
+            return np.clip(result, base_price * 0.9, base_price * 1.1)
     
     def fit_dcc_garch(self) -> None:
         """使用 R 的 rmgarch 套件擬合 DCC-GARCH 模型"""

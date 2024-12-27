@@ -420,8 +420,9 @@ class plot_predictions:
         lower_bound = []
         
         for pred in y_preds:
-            upper_bound.append(np.percentile(pred, self.args.bound_percent))
-            lower_bound.append(np.percentile(pred, 100 - self.args.bound_percent))
+            bound_percent = (100 - self.args.bound_percent) // 2
+            upper_bound.append(np.percentile(pred, bound_percent))
+            lower_bound.append(np.percentile(pred, 100 - bound_percent))
 
         return np.array(upper_bound), np.array(lower_bound)
     
