@@ -39,9 +39,7 @@ def tabgan_objective(trial):
         val_size = len(train_datasets) - train_size
         train_data, val_data = random_split(train_datasets, [train_size, val_size])
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
-        # val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
-        test_datasets = StockDataset(args, f'./data/{args.stock}/test.csv')
-        val_loader = DataLoader(test_datasets, batch_size=args.batch_size, shuffle=False)
+        val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False)
         print(f'Starting trial with params: {trial.params}')
         # model setup
         model = TABGAN(train_datasets, args)
