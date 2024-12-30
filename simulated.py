@@ -154,45 +154,26 @@ class DCCGARCHSimulator:
             }
     
     def combine_components(self, trend, seasonal, residuals, col_name):
-        if col_name in ['Volume']:
-            # 使用對數轉換後的數據計算標準差和範圍
-            col_std = self.data[col_name].std()
-            col_min = self.data[col_name].min()
-            col_max = self.data[col_name].max()
-            
-            # 避免除以零或極小值
-            residuals_std = np.std(residuals) if isinstance(residuals, np.ndarray) else abs(residuals)
-            if residuals_std < self.epsilon:
-                residuals_std = self.epsilon
-            
-            # 使用較小的縮放範圍，因為這是在對數尺度上
-            scale_factor = np.clip(col_std / residuals_std, -10, 10)
-            
-            # 計算並限制結果範圍
-            scaled_residuals = residuals * scale_factor
-            result = trend + seasonal + scaled_residuals
-            
-            # 在對數尺度上的合理範圍內進行限制
-            return np.clip(result, col_min, col_max)
+        # 取得數據標準差
+        col_std = self.data[col_name].std()
         
-        else:  # 對於價格類欄位保持原有的處理方式
-            price_std = self.data[col_name].std()
+        # 計算殘差標準差，並處理極小值
+        residuals_std = np.std(residuals) if isinstance(residuals, np.ndarray) else abs(residuals)
+        residuals_std = max(residuals_std, self.epsilon)
+        base_price = trend + seasonal
+        result_min = base_price * 0.9
+        result_max = base_price * 1.1
+        # 根據不同欄位設定縮放範圍
+        if col_name in ['Volume']:
+            scale_range = (-10, 10)
+        else:  # 價格類欄位
+            scale_range = (-50, 50)
             
-            # 避免除以零或極小值
-            residuals_std = np.std(residuals) if isinstance(residuals, np.ndarray) else abs(residuals)
-            if residuals_std < self.epsilon:
-                residuals_std = self.epsilon
-            
-            # 限制縮放係數的範圍
-            scale_factor = np.clip(price_std / residuals_std, -50, 50)
-            
-            # 計算並限制結果範圍
-            scaled_residuals = residuals * scale_factor
-            result = trend + seasonal + scaled_residuals
-            
-            # 確保結果在合理範圍內
-            base_price = trend + seasonal
-            return np.clip(result, base_price * 0.9, base_price * 1.1)
+        # 計算並限制結果
+        scale_factor = np.clip(col_std / residuals_std, *scale_range)
+        result = trend + seasonal + (residuals * scale_factor)
+        
+        return np.clip(result, result_min, result_max)
     
     def fit_dcc_garch(self) -> None:
         """使用 R 的 rmgarch 套件擬合 DCC-GARCH 模型"""
