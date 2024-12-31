@@ -26,10 +26,10 @@ def tabgan_objective(trial):
         args.num_layers_d = trial.suggest_int('num_layers_d', 1, 4)
         args.num_head_d = trial.suggest_categorical('num_head_d', [4, 8, 16])
         # train
-        args.epoch  = trial.suggest_int('epoch', 100, 300)
+        args.epoch  = trial.suggest_int('epoch', 200, 200)
         args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-2, log=True)
         args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-2, log=True)
-        args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])
+        args.batch_size = trial.suggest_categorical('batch_size', [512, 1024])
         args.d_iter = trial.suggest_int('d_iter', 1, 5)
         args.gp_lambda = trial.suggest_int('gp_lambda', 1, 10)
         
@@ -67,7 +67,7 @@ def rcgan_objective(trial):
         args.epoch  = trial.suggest_int('epoch', 100, 500)
         args.lr_d = trial.suggest_float('lr_d', 1e-6, 1e-2, log=True)
         args.lr_g = trial.suggest_float('lr_g', 1e-6, 1e-2, log=True)
-        args.batch_size = trial.suggest_categorical('batch_size', [128, 256, 512])
+        args.batch_size = trial.suggest_categorical('batch_size', [256, 512, 1024])
         
         # prepare dataset
         train_datasets = StockDataset(args, f'./data/{args.stock}/train.csv')

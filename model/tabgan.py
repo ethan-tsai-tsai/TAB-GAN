@@ -3,7 +3,6 @@ import os
 import torch
 import pickle
 import numpy as np
-from torch import nn
 
 # import files
 from lib.utils import save_model
@@ -71,6 +70,7 @@ class TABGAN:
                 optimizer_g.zero_grad()
                 kld_loss.backward()
                 optimizer_g.step()
+                
             total_loss_d += loss_d.cpu().detach().numpy()
             total_loss_g += loss_g.cpu().detach().numpy()
             test_loss_d, test_loss_g, kld = self.validation(val_loader)
@@ -82,8 +82,7 @@ class TABGAN:
             results['test_kld'].append(kld)
             
             if (epoch+1)%(self.args.epoch//10)==0:
-                print(f'Epoch: {epoch+1}/{self.args.epoch}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
-            
+                print(f'Epoch: {epoch+1}/{self.args.epoch}, Val KLD: {kld:.4f}, loss_d: {total_loss_d:.2f}, loss_g: {total_loss_g:.2f}, test loss_d: {test_loss_d:.2f}, test loss_g: {test_loss_g:.2f}')
         # save model
         # save_model(self.model_d, self.model_g, self.args, f'{self.model_path}/final.pth')
         if self.args.mode == 'train': save_loss_curve(results, self.args)
@@ -115,8 +114,9 @@ class TABGAN:
                 kld = calc_kld(fake_data.cpu().detach().numpy(), y.cpu().detach().numpy())
                 if kld <= self.best_kld and kld != np.inf:
                     self.best_kld = kld
-                    save_model(self.model_d, self.model_g, self.args, f'./{self.model_path}/final.pth')
-                    if self.args.mode == 'train': print(f'Update best kld with {kld}')
+                    if self.args.mode == 'train':
+                        save_model(self.model_d, self.model_g, self.args, f'./{self.model_path}/final.pth')
+                        print(f'Update best kld with {kld}')
         return total_loss_d, total_loss_g, kld
         
     def predict(self, X, y=None):

@@ -32,32 +32,50 @@ def calc_kld(generated_data, ground_truth, bins=50, epsilon=1e-5):
     return kld
 
 class KLDLoss(nn.Module):
-    def __init__(self, reduction='mean'):
-        """
-        初始化 KL Divergence Loss
+    def __init__(self, bins=50, epsilon=1e-5):
+        super().__init__()
+        self.bins = bins
+        self.epsilon = epsilon
         
-        Args:
-            reduction (str): 'mean', 'sum' 或 'none'，決定如何減少損失值
-        """
-        super(KLDLoss, self).__init__()
-        self.reduction = reduction
+    def _soft_histogram(self, x, range_min, range_max):
+        # 創建 bin 中心點
+        bin_centers = torch.linspace(range_min, range_max, self.bins, device=x.device)
+        # 計算每個數據點到 bin 中心的距離
+        x = x.unsqueeze(-1)  # [N, 1]
+        bin_centers = bin_centers.unsqueeze(0)  # [1, bins]
         
-    def forward(self, y_pred, y_true):
-        y_pred = F.softmax(y_pred, dim=1)
-        y_true = F.softmax(y_true, dim=1)
+        # 使用 softmax 計算軟直方圖
+        dist = -(x - bin_centers).pow(2) / (0.1 * (range_max - range_min))
+        weights = torch.softmax(dist, dim=1)  # [N, bins]
         
-        eps = 1e-7
-        y_pred = torch.clamp(y_pred, eps, 1.0)
-        y_true = torch.clamp(y_true, eps, 1.0)
+        # 加總得到直方圖
+        histogram = weights.sum(dim=0)  # [bins]
+        return histogram
         
-        kld = torch.sum(y_true * torch.log(y_true / y_pred), dim=1)
+    def forward(self, generated_data, ground_truth):
+        # 將資料 flatten
+        generated_data = generated_data.reshape(-1)
+        ground_truth = ground_truth.reshape(-1)
         
-        if self.reduction == 'mean':
-            return torch.mean(kld)
-        elif self.reduction == 'sum':
-            return torch.sum(kld)
-        else:  # 'none'
-            return kld
+        # 計算範圍
+        with torch.no_grad():
+            all_data = torch.cat([generated_data.detach(), ground_truth])
+            range_min = torch.quantile(all_data, 0.01)
+            range_max = torch.quantile(all_data, 0.99)
+        
+        # 計算軟直方圖
+        pd_gt = self._soft_histogram(ground_truth, range_min, range_max)
+        pd_gen = self._soft_histogram(generated_data, range_min, range_max)
+        
+        # 添加平滑值並正規化
+        pd_gt = pd_gt + self.epsilon
+        pd_gen = pd_gen + self.epsilon
+        
+        pd_gt = pd_gt / torch.sum(pd_gt)
+        pd_gen = pd_gen / torch.sum(pd_gen)
+        
+        # 計算 KLD
+        return torch.sum(pd_gt * (torch.log(pd_gt) - torch.log(pd_gen)))
 
 class TechnicalIndicators:
     @staticmethod
