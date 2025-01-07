@@ -50,7 +50,7 @@ class TradingStrategy:
             signal = 0
             
             if current_position == 0:
-                if actual_prices[t] < lower_bounds[t] * 0.98:
+                if actual_prices[t] < lower_bounds[t]:
                     signal = 1
                     current_position = 1
                     last_trade_time = t
