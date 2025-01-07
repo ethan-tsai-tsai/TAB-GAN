@@ -49,14 +49,13 @@ class TradingStrategy:
         for t in range(len(actual_prices)):
             signal = 0
             
-            if current_position == 0:  # 考慮買入
-                # 價格低於下界時買入
-                if actual_prices[t] < lower_bounds[t]:
+            if current_position == 0:
+                if actual_prices[t] < lower_bounds[t] * 0.98:
                     signal = 1
                     current_position = 1
                     last_trade_time = t
                     
-            else:  # 考慮賣出
+            else:
                 # 計算實際獲利
                 is_day_trade = (t - last_trade_time) < minutes_per_day
                 sell_cost = self.calculate_sell_cost(is_day_trade)
