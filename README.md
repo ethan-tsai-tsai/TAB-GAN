@@ -15,7 +15,7 @@ In the application of trading strategies, this study analyzes five Taiwan-listed
 If you find this project useful, please cite the following thesis:
 
 ```
-Chou, H. (2023). A Transformer-Augmented Bidirectional GRU Generative Adversarial Network for Stock Price Prediction (Master's thesis, National Taiwan University of Science and Technology, Taipei, Taiwan). Retrieved from https://hdl.handle.net/11296/2j27h8
+Tsai, Zhi-Hong. Transformer Augmented Bidirectional GRU Generative Adversarial Network and Corresponding Financial Investment Strategies. 2025. Fu Jen Catholic University, Master’s Thesis. National Digital Library of Theses and Dissertations in Taiwan. https://hdl.handle.net/11296/2j27h8
 ```
 
 ## Features
